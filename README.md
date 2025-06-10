@@ -4,13 +4,13 @@
 
 EdgeFlow Kafka Consumer and Producer
 
-This node can be used in order to produce and consume messages to Kafka. It is highly depends on 'kafka-node' library. Consists three nodes.
+This node can be used in order to produce and consume messages to Kafka. It is highly depends on 'kafkajs' library. Consists three nodes.
 
 - hm-kafka-broker
 - hm-kafka-producer
 - hm-karka-consumer
 
-Note: This library add sasl/plain supports base on kafka-client project. Now supports SCRAM-SHA-256 and SCRAM-SHA-512 authentication mechanisms.
+Note: This library add sasl/plain supports base on kafkajs project. Now supports SCRAM-SHA-256 and SCRAM-SHA-512 authentication mechanisms.
 
 ## Input Parameters
 ### kafka-broker

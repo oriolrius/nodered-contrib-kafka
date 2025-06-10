@@ -1,5 +1,4 @@
 module.exports = function (RED) {
-    const kafka = require('kafka-node');
     const { getNameTypes, getMsgValues } = require('./utils');
 
     function getIotOptions(config) {
@@ -56,19 +55,29 @@ module.exports = function (RED) {
             }
             
             try {
-                let kafkaClient = new kafka.KafkaClient(broker.getOptions());
-                node.debug(`[Kafka Producer] KafkaClient created successfully`);
+                const kafka = broker.getKafka();
+                node.debug(`[Kafka Producer] Kafka instance obtained successfully`);
 
-                let producerOptions = new Object();
-                producerOptions.requireAcks = config.requireAcks;
-                producerOptions.ackTimeoutMs = config.ackTimeoutMs;
+                // KafkaJS producer options
+                let producerOptions = {
+                    maxInFlightRequests: 1,
+                    idempotent: config.requireAcks === 1,
+                    requestTimeout: config.ackTimeoutMs || 30000
+                };
 
-                node.debug(`[Kafka Producer] Producer options - Require ACKs: ${producerOptions.requireAcks}, ACK Timeout: ${producerOptions.ackTimeoutMs}ms`);
+                node.debug(`[Kafka Producer] Producer options - Idempotent: ${producerOptions.idempotent}, Request Timeout: ${producerOptions.requestTimeout}ms`);
 
                 node.lastMessageTime = null;
 
-                node.producer = new kafka.HighLevelProducer(kafkaClient, producerOptions);
-                node.debug(`[Kafka Producer] HighLevelProducer created successfully`);
+                node.producer = kafka.producer(producerOptions);
+                node.debug(`[Kafka Producer] Producer created successfully`);
+
+                node.onConnect = async function () {
+                    node.ready = true;
+                    node.lastMessageTime = new Date().getTime();
+                    node.debug(`[Kafka Producer] Producer ready and connected to Kafka broker`);
+                    node.status({ fill: "green", shape: "ring", text: "Ready" });
+                }
 
                 node.onError = function (err) {
                     node.ready = false;
@@ -79,15 +88,10 @@ module.exports = function (RED) {
                     node.error(err);
                 }
 
-                node.onReady = function () {
-                    node.ready = true;
-                    node.lastMessageTime = new Date().getTime();
-                    node.debug(`[Kafka Producer] Producer ready and connected to Kafka broker`);
-                    node.status({ fill: "green", shape: "ring", text: "Ready" });
-                }
-
-                node.producer.on('ready', node.onReady);
-                node.producer.on('error', node.onError);
+                // Connect the producer
+                node.producer.connect()
+                    .then(node.onConnect)
+                    .catch(node.onError);
                 
             } catch (err) {
                 node.error(`[Kafka Producer] Failed to initialize producer: ${err.message}`);
@@ -97,7 +101,7 @@ module.exports = function (RED) {
 
         node.init();
 
-        node.on('input', function (msg) {
+        node.on('input', async function (msg) {
             node.debug(`[Kafka Producer] Received input message`);
             
             if (msg.broker) {
@@ -113,13 +117,15 @@ module.exports = function (RED) {
             }
             
             if (node.ready) {
-                var sendOptions = new Object();
-
-                sendOptions.topic = config.topic;
-                sendOptions.attributes = config.attributes;
+                let messageValue;
+                const compressionTypes = {
+                    0: 'none',
+                    1: 'gzip',
+                    2: 'snappy'
+                };
                 
-                node.debug(`[Kafka Producer] Preparing message for topic: ${sendOptions.topic}`);
-                node.debug(`[Kafka Producer] Compression attributes: ${sendOptions.attributes}`);
+                node.debug(`[Kafka Producer] Preparing message for topic: ${config.topic}`);
+                node.debug(`[Kafka Producer] Compression type: ${compressionTypes[config.attributes] || 'none'}`);
                 
                 if (config.useiot || iotOptions.useiot) {
                     node.debug(`[Kafka Producer] Processing message in IoT format`);
@@ -134,33 +140,42 @@ module.exports = function (RED) {
                             ts: tsList,
                             values
                         };
-                        sendOptions.messages = [JSON.stringify(message)];
-                        node.debug(`[Kafka Producer] IoT message prepared: ${JSON.stringify(message)}`);
+                        messageValue = JSON.stringify(message);
+                        node.debug(`[Kafka Producer] IoT message prepared: ${messageValue}`);
                     } catch (err) {
                         node.error(`[Kafka Producer] Error preparing IoT message: ${err.message}`);
                         return;
                     }
                 } else {
                     node.debug(`[Kafka Producer] Processing message in raw format`);
-                    const message = typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload)
-                    sendOptions.messages = [message];
-                    node.debug(`[Kafka Producer] Raw message prepared: ${message}`);
+                    messageValue = typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload);
+                    node.debug(`[Kafka Producer] Raw message prepared: ${messageValue}`);
+                }
+
+                const kafkaMessage = {
+                    topic: config.topic,
+                    messages: [{
+                        value: messageValue
+                    }]
+                };
+
+                // Add compression if specified
+                if (config.attributes && config.attributes > 0) {
+                    kafkaMessage.compression = compressionTypes[config.attributes];
                 }
 
                 node.debug(`[Kafka Producer] Sending message to Kafka`);
-                node.producer.send([sendOptions], function (err) {
-                    if (!err) {
-                        node.lastMessageTime = new Date().getTime();
-                        node.debug(`[Kafka Producer] Message sent successfully to topic: ${sendOptions.topic}`);
-                        node.status({ fill: "blue", shape: "ring", text: "Sending" });
-                    }
-                    else {
-                        node.lastMessageTime = null;
-                        node.error(`[Kafka Producer] Failed to send message: ${err.message}`);
-                        node.debug(`[Kafka Producer] Send error details: ${JSON.stringify(err, null, 2)}`);
-                        node.status({ fill: "red", shape: "ring", text: "Error" });
-                    }
-                });
+                try {
+                    await node.producer.send(kafkaMessage);
+                    node.lastMessageTime = new Date().getTime();
+                    node.debug(`[Kafka Producer] Message sent successfully to topic: ${config.topic}`);
+                    node.status({ fill: "blue", shape: "ring", text: "Sending" });
+                } catch (err) {
+                    node.lastMessageTime = null;
+                    node.error(`[Kafka Producer] Failed to send message: ${err.message}`);
+                    node.debug(`[Kafka Producer] Send error details: ${JSON.stringify(err, null, 2)}`);
+                    node.status({ fill: "red", shape: "ring", text: "Error" });
+                }
             }
         });
 
@@ -176,17 +191,19 @@ module.exports = function (RED) {
 
         node.interval = setInterval(checkLastMessageTime, 1000);
 
-        node.on('close', function () {
+        node.on('close', async function () {
             node.debug(`[Kafka Producer] Closing producer for topic: ${config.topic}`);
             node.ready = false;
             node.status({});
             clearInterval(node.interval);
             
             if (node.producer) {
-                node.debug(`[Kafka Producer] Removing event listeners`);
-                node.producer.removeListener('ready', node.onReady);
-                node.producer.removeListener('error', node.onError);
-                node.debug(`[Kafka Producer] Producer closed successfully`);
+                try {
+                    await node.producer.disconnect();
+                    node.debug(`[Kafka Producer] Producer disconnected successfully`);
+                } catch (err) {
+                    node.error(`[Kafka Producer] Error disconnecting producer: ${err.message}`);
+                }
             }
         })
     }

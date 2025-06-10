@@ -1,6 +1,6 @@
 # Kafka Client Debug Guide
 
-This guide explains how to use the comprehensive debug information added to the Kafka client nodes.
+This guide explains how to use the comprehensive debug information added to the Kafka client nodes. The library has been migrated from kafka-node to kafkajs for better performance and modern features.
 
 ## Debug Information Available
 

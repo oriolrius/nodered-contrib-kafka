@@ -3,7 +3,7 @@ module.exports = function(RED) {
         RED.nodes.createNode(this,config);
         var node = this;
 
-        function e1() {
+        function generateUUID() {
             var u='',i=0;
             while(i++<36) {
                 var c='xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'[i-1],r=Math.random()*16|0,v=c=='x'?r:(r&0x3|0x8);
@@ -12,9 +12,7 @@ module.exports = function(RED) {
             return u;
         }
             
-        node.init = function(){
-            const kafka = require('kafka-node'); 
-
+        node.init = async function(){
             node.debug(`[Kafka Consumer] Initializing consumer for topic: ${config.topic}`);
 
             var broker = RED.nodes.getNode(config.broker);
@@ -23,30 +21,29 @@ module.exports = function(RED) {
                 return;
             }
 
-            var options = broker.getOptions();
-            var topic = config.topic;
+            const kafka = broker.getKafka();
+            const topic = config.topic;
     
-            options.groupId = 'nodered_hm_kafka_client_' + (!config.groupid || config.groupid === '' ? e1() : config.groupid);
-            options.fromOffset = config.fromOffset;
-            options.outOfRangeOffset = config.outOfRangeOffset;
-            options.fetchMinBytes = config.minbytes || 1;
-            options.fetchMaxBytes = config.maxbytes || 1048576;
-            options.encoding = config.encoding || 'utf8';
-
-            node.debug(`[Kafka Consumer] Consumer group ID: ${options.groupId}`);
-            node.debug(`[Kafka Consumer] From offset: ${options.fromOffset}`);
-            node.debug(`[Kafka Consumer] Out of range offset: ${options.outOfRangeOffset}`);
-            node.debug(`[Kafka Consumer] Fetch min bytes: ${options.fetchMinBytes}`);
-            node.debug(`[Kafka Consumer] Fetch max bytes: ${options.fetchMaxBytes}`);
-            node.debug(`[Kafka Consumer] Encoding: ${options.encoding}`);
+            const groupId = 'nodered_hm_kafka_client_' + (!config.groupid || config.groupid === '' ? generateUUID() : config.groupid);
+            
+            node.debug(`[Kafka Consumer] Consumer group ID: ${groupId}`);
+            node.debug(`[Kafka Consumer] From offset: ${config.fromOffset}`);
+            node.debug(`[Kafka Consumer] Out of range offset: ${config.outOfRangeOffset}`);
+            node.debug(`[Kafka Consumer] Fetch min bytes: ${config.minbytes || 1}`);
+            node.debug(`[Kafka Consumer] Fetch max bytes: ${config.maxbytes || 1048576}`);
+            node.debug(`[Kafka Consumer] Encoding: ${config.encoding || 'utf8'}`);
 
             node.lastMessageTime = null;
 
             try {
-                node.consumerGroup = new kafka.ConsumerGroup(options, topic);
-                node.debug(`[Kafka Consumer] ConsumerGroup created successfully`);
+                node.consumer = kafka.consumer({ 
+                    groupId: groupId,
+                    minBytes: config.minbytes || 1,
+                    maxBytes: config.maxbytes || 1048576
+                });
+                node.debug(`[Kafka Consumer] Consumer created successfully`);
             } catch (err) {
-                node.error(`[Kafka Consumer] Failed to create ConsumerGroup: ${err.message}`);
+                node.error(`[Kafka Consumer] Failed to create Consumer: ${err.message}`);
                 node.status({fill:"red",shape:"ring",text:"Failed to create consumer"});
                 return;
             }
@@ -67,11 +64,23 @@ module.exports = function(RED) {
                 node.error(err);
             } 
             
-            node.onMessage = function(message){
+            node.onMessage = async function({ topic, partition, message }){
                 node.lastMessageTime = new Date().getTime();
-                node.debug(`[Kafka Consumer] Received message from topic ${message.topic}, partition ${message.partition}, offset ${message.offset}`);
-                node.debug(`[Kafka Consumer] Message value: ${typeof message.value === 'string' ? message.value : JSON.stringify(message.value)}`);
-                var msg = { payload:message };
+                const value = config.encoding === 'buffer' ? message.value : message.value.toString();
+                node.debug(`[Kafka Consumer] Received message from topic ${topic}, partition ${partition}, offset ${message.offset}`);
+                node.debug(`[Kafka Consumer] Message value: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+                
+                // Create message object similar to kafka-node format
+                const messageObj = {
+                    topic: topic,
+                    partition: partition,
+                    offset: message.offset,
+                    key: message.key ? message.key.toString() : null,
+                    value: value,
+                    timestamp: message.timestamp
+                };
+                
+                var msg = { payload: messageObj };
                 node.send(msg);
                 node.status({fill:"blue",shape:"ring",text:"Reading"});
             }
@@ -88,44 +97,43 @@ module.exports = function(RED) {
               
             node.interval = setInterval(checkLastMessageTime, 1000);
 
-            node.debug(`[Kafka Consumer] Attaching event listeners`);
-            node.consumerGroup.on('connect', node.onConnect);
-            node.consumerGroup.on('message', node.onMessage);
-            node.consumerGroup.on('error', node.onError);
-            node.consumerGroup.on('offsetOutOfRange', node.onError);
-            
-            // Additional debug event listeners
-            node.consumerGroup.on('rebalancing', function() {
-                node.debug(`[Kafka Consumer] Consumer group rebalancing`);
-            });
-            
-            node.consumerGroup.on('rebalanced', function() {
-                node.debug(`[Kafka Consumer] Consumer group rebalanced`);
-            });
+            try {
+                node.debug(`[Kafka Consumer] Connecting to Kafka`);
+                await node.consumer.connect();
+                node.onConnect();
+
+                // Subscribe to topic
+                await node.consumer.subscribe({ 
+                    topic: topic, 
+                    fromBeginning: config.fromOffset === 'earliest' 
+                });
+                node.debug(`[Kafka Consumer] Subscribed to topic: ${topic}`);
+
+                // Run consumer
+                await node.consumer.run({
+                    eachMessage: node.onMessage
+                });
+                node.debug(`[Kafka Consumer] Consumer started successfully`);
+
+            } catch (err) {
+                node.onError(err);
+            }
         }
 
-        node.on('close', function() {
+        node.on('close', async function() {
             node.debug(`[Kafka Consumer] Closing consumer for topic: ${config.topic}`);
             node.status({});
             clearInterval(node.interval);
             
-            if (node.consumerGroup) {
-                node.debug(`[Kafka Consumer] Removing event listeners`);
-                node.consumerGroup.removeListener('connect', node.onConnect);
-                node.consumerGroup.removeListener('message', node.onMessage);
-                node.consumerGroup.removeListener('error', node.onError);
-                node.consumerGroup.removeListener('offsetOutOfRange', node.onError);
-
-                node.debug(`[Kafka Consumer] Closing consumer group`);
-                node.consumerGroup.close(true, function(err) {
-                    if(err){
-                        node.error(`[Kafka Consumer] Error closing consumer group: ${err.message}`);
-                        return;
-                    }
-
-                    node.debug(`[Kafka Consumer] Consumer group closed successfully`);
-                    node.consumerGroup = null;
-                });
+            if (node.consumer) {
+                try {
+                    node.debug(`[Kafka Consumer] Disconnecting consumer`);
+                    await node.consumer.disconnect();
+                    node.debug(`[Kafka Consumer] Consumer disconnected successfully`);
+                    node.consumer = null;
+                } catch (err) {
+                    node.error(`[Kafka Consumer] Error disconnecting consumer: ${err.message}`);
+                }
             }
         });
 

@@ -1,6 +1,6 @@
 {
     "name": "@edgeflow/kafka-client",
-    "version": "1.0.3",
+    "version": "2.0.0",
     "description": "EdgeFlow Kafka Consumer and Producer",
     "node-red": {
         "version": ">=3.0.0",
@@ -14,7 +14,7 @@
             "kafka-producer",
             "kafka-consumer",
             "kafka-broker",
-            "kafka-node",
+            "kafkajs",
             "big-data",
             "edgeflow"
         ]
@@ -27,7 +27,7 @@
         "kafka-consumer",
         "node-red",
         "kafka-broker",
-        "kafka-node",
+        "kafkajs",
         "big-data",
         "data"
     ],
@@ -45,6 +45,6 @@
     },
     "license": "MIT",
     "dependencies": {
-        "kafka-node": "^5.0.0"
+        "kafkajs": "^2.2.4"
     }
 }
