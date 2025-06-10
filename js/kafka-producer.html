@@ -1,0 +1,194 @@
+<script type="text/html" data-help-name="hm-kafka-producer">
+    <p>Get a connection for the message to be used in following nodes</p>
+    <p>On successfully getting connection message sent OK out otherwise send to failed connector</p>
+</script>
+
+<script type="text/html" data-template-name="hm-kafka-producer">
+
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name </label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    
+    <div class="form-row">
+    	<label for="node-input-broker"><i class="fa fa-list-ul"></i> Broker </label>
+    	<input type="text" id="node-input-broker">
+  	</div>
+
+    <div class="form-row">
+        <label for="node-input-topic"><i class="fa fa-tag"></i> Topic </label>
+        <input type="text" id="node-input-topic" placeholder="Topic">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-requireAcks"><i class="fa fa-tag"></i> Require Ack </label>
+        <input type="number" min="0" max="1"  id="node-input-requireAcks" >
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-ackTimeoutMs"><i class="fa fa-tag"></i> Ack Timeout (Ms) </label>
+        <input type="number" min="100" max="100000" step="100" id="node-input-ackTimeoutMs" >
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-attributes"><i class="fa fa-tag"></i> Attributes </label>
+         <select id="node-input-attributes">
+         	<option value="0">No compression</option>
+         	<option value="1">Compress using GZip</option>
+         	<option value="2">Compress using snappy</option>
+         </select>
+    </div>
+    <div class="form-row">
+		<input type="checkbox" id="node-input-useiot" style="display: inline-block; width: auto; vertical-align: top;">
+		<label for="node-input-useiot" style="width: auto">Cloud Configuration</label>
+	</div>
+	<!-- iot Cloud Configuration -->
+	<div id="node-config-iot" class="form-row">
+		<hr/>
+		<!-- Object Model -->
+		<div class="form-row">
+			<label for="node-input-model"><i class="fa fa-tree"></i> <span>Model</span></label>
+			<select type="text" id="node-input-model" style="width:70%;">
+				<option value="use">- Use msg.model to set -</option>
+			</select>
+			<!-- <input  id="node-input-model" type="text" placeholder="Enter model id" > -->
+		</div>
+		<!-- Device Instance -->
+		<div class="form-row">
+			<label for="node-input-device"><i class="fa fa-laptop"></i> <span>Device</span></label>
+			<select type="text" id="node-input-device" style="width:70%;">
+				<option value="use">- Use msg.device to set -</option>
+			</select>
+		</div>
+		<div class="form-row">
+			<label for="node-input-iotType"><i class="fa fa-tasks"></i> <span>Type</span></label>
+			<!-- Report types: properties: props, events: event, services: service -->
+			<select type="text" id="node-input-iotType" style="width:70%;">
+				<option value="props">Properties</option>
+				<option value="event">Event</option>
+				<option value="service">Service</option>
+				<option value="use">- Use msg.iotType to set -</option>
+			</select>
+		</div>
+		<div class="form-row" style="margin-bottom:0;">
+			<label><i class="fa fa-list"></i> <span>Field Structure</span></label>
+		</div>
+		<div class="form-row node-input-iot-container-row">
+			<ol id="node-input-iot-container"></ol>
+		</div>
+	</div>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('hm-kafka-producer', {
+        category: 'IOT',
+        paletteLabel: "Data to Cloud",
+        color: '#00CED1',
+        defaults: {
+            name: { required: false },
+            broker: { type: "hm-kafka-broker" },
+            topic: { required: true },
+            requireAcks: { value: 1, required: true },
+            ackTimeoutMs: { value: 100, required: true },
+            attributes: { value: 0, required: true },
+            // edgeflow to iot config
+            useiot: { value: false },
+            model: { required: false, value: "" },
+            device: { required: false, value: "" },
+            iotType: { required: false, value: "props" },
+            fields: { required: false, value: [] },
+        },
+        inputs: 1,
+        inputLabels: "",
+        outputs: 0,
+        outputLabels: [],
+        icon: "publish.png",
+        allign: "right",
+        label: function () {
+            return this.name || "Data to Cloud";
+        },
+        labelStyle: function () {
+            return "node_label_italic";
+        },
+        oneditprepare: function () {
+            const node = this;
+            function checkIot() {
+                if (!$("#node-input-useiot").is(':checked')) {
+                    $("#node-config-iot").hide();
+                }
+                else {
+                    $("#node-config-iot").show();
+                }
+            }
+            // edgeflow to iot config
+
+            checkIot();
+
+            $("#node-input-useiot").click(function () {
+                checkIot();
+            });
+
+            const headerList = $("#node-input-iot-container").css('min-height', '360px').css('min-width', '430px').editableList({
+                addItem: function (container, i, item) {
+                    const row = $('<div/>').css({
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        display: 'flex'
+                    }).appendTo(container);
+                    const propertNameCell = $('<div/>').css({ 'flex-grow': 1 }).appendTo(row);
+                    const propertyName = $('<input/>', { class: "node-input-key-name", type: "text", style: "width: 100%" })
+                        .appendTo(propertNameCell)
+                        .typedInput({ types: ['str'] });
+
+                    const propertyValueCell = $('<div/>').css({ 'flex-grow': 1, 'margin-left': '10px' }).appendTo(row);
+                    const propertyValue = $(`<select class= "node-input-key-value">${optionHtml}</select>`, { style: "width: 100%" })
+                        .appendTo(propertyValueCell)
+
+                    const setup = function (_header) {
+                        const { fieldName, dataType = 'TEXT' } = item;
+                        propertyName.typedInput('value', fieldName);
+                        propertyValue.val(dataType);
+                    }
+                    setup(item);
+
+                },
+                sortable: true,
+                removable: true
+            });
+            if (node.fields) {
+                for (let index = 0; index < node.fields.length; index++) {
+                    const element = node.fields[index];
+                    headerList.editableList('addItem', node.fields[index]);
+                }
+            }
+        },
+        oneditsave: function () {
+            const fields = $("#node-input-iot-container").editableList('items');
+            const node = this;
+            node.fields = [];
+            fields.each(function (i) {
+                const item = $(this);
+                const fieldName = item.find(".node-input-key-name").val();
+                const dataType = item.find(".node-input-key-value").find(":selected").val();
+                console.log(fieldName, dataType)
+                node.fields.push({
+                    fieldName, dataType
+                })
+            });
+        },
+        oneditresize: function (size) {
+            const dlg = $("#dialog-form");
+            const expandRow = dlg.find('.node-input-iot-container-row');
+            let height = dlg.height() - 300;
+            if (expandRow && expandRow.length) {
+                const siblingRows = dlg.find('> .form-row:not(.node-input-iot-container-row)');
+                for (let i = 0; i < siblingRows.size(); i++) {
+                    const cr = $(siblingRows[i]);
+                    if (cr.is(":visible"))
+                        height -= cr.outerHeight(true);
+                }
+                $("#node-input-iot-container").editableList('height', height);
+            }
+        }
+    });
+</script>

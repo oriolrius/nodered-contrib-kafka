@@ -1,0 +1,266 @@
+<script type="text/html" data-help-name="hm-kafka-broker">
+    <p>Define a hm-kafka-broker. </p>
+    <p>"Hosts process.env name" can contain a process.env property name that contained hosts as JSON string,e.g.</p>
+    <textarea>process.env.atesthosts='[{"host":"atesthost1","port":1234},{"host":"atesthost2","port":4321}]';</textarea>
+    <p>Note, minimal data quality checks performed.</p>
+</script>
+
+<script type="text/html" data-template-name="hm-kafka-broker">
+
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input id="node-config-input-name" type="text" placeholder="Name">
+	</div>
+	
+	<div class="form-row">
+        <label for="node-config-input-hosts"><i class="fa fa-tag"></i> Hosts</label>
+        <input  id="node-config-input-hosts" type="text" placeholder="example1.com:9092,example2.com:9092,..." >
+    </div>
+
+	<div class="form-row">
+		<input type="checkbox" id="node-config-input-usesasl" style="display: inline-block; width: auto; vertical-align: top;">
+		<label for="node-config-input-usesasl" style="width: auto">Enable SASL</label>
+	</div>
+
+	<div id="node-config-sasl" class="form-row">
+		<div class="form-row">
+			<label for="node-config-input-saslmechanism"><i class="fa fa-cog"></i> SASL Mechanism</label>
+			<select id="node-config-input-saslmechanism">
+				<option value="plain">PLAIN</option>
+				<option value="scram-sha-256">SCRAM-SHA-256</option>
+				<option value="scram-sha-512">SCRAM-SHA-512</option>
+			</select>
+		</div>
+		<div class="form-row">
+			<label for="node-config-input-username"><i class="fa fa-tag"></i> Username</label>
+			<input  id="node-config-input-username" type="text" placeholder="username" >
+		</div>
+		<div class="form-row">
+			<label for="node-config-input-password"><i class="fa fa-tag"></i> Password</label>
+			<input  id="node-config-input-password" type="text" placeholder="password" >
+		</div>
+	</div>
+
+	<div class="form-row">
+		<input type="checkbox" id="node-config-input-usetls" style="display: inline-block; width: auto; vertical-align: top;">
+		<label for="node-config-input-usetls" style="width: auto">Enable TLS</label>
+	</div>
+	
+	<div id="node-config-tls" class="form-row">
+		<div class="form-row">
+			<label for="node-config-input-cacert"><i class="fa fa-tag"></i> CA Certificate</label>
+			<input  id="node-config-input-cacert" type="text" placeholder="/var/..." >
+		</div>
+		
+		<div class="form-row">
+			<label for="node-config-input-clientcert"><i class="fa fa-tag"></i> Client Certificate</label>
+			<input  id="node-config-input-clientcert" type="text" placeholder="/var/..." >
+		</div>
+		
+		<div class="form-row">
+			<label for="node-config-input-privatekey"><i class="fa fa-tag"></i> Private Key</label>
+			<input  id="node-config-input-privatekey" type="text" placeholder="/var/..." >
+		</div>
+		
+		<div class="form-row">
+			<label for="node-config-input-passphrase"><i class="fa fa-tag"></i> Passphrase</label>
+			<input  id="node-config-input-passphrase" type="password" placeholder="Passphrase" >
+		</div>
+
+		<div class="form-row">
+			<input type="checkbox" id="node-config-input-selfsign" style="display: inline-block; width: auto; vertical-align: top;">
+			<label for="node-config-input-selfsign" style="width: auto">Self-signed</label>
+		</div>
+	</div>
+
+	<div class="form-row">
+		<input type="checkbox" id="node-config-input-useiot" style="display: inline-block; width: auto; vertical-align: top;">
+		<label for="node-config-input-useiot" style="width: auto">Enable IoT Cloud Configuration</label>
+	</div>
+
+	<div id="node-config-iot" class="form-row">
+		<div class="form-row">
+			<label for="node-config-input-model"><i class="fa fa-tree"></i> Model</label>
+			<select id="node-config-input-model">
+				<option value="use">- Use msg.broker.model to set -</option>
+			</select>
+		</div>
+		<div class="form-row">
+			<label for="node-config-input-device"><i class="fa fa-laptop"></i> Device</label>
+			<select id="node-config-input-device">
+				<option value="use">- Use msg.broker.device to set -</option>
+			</select>
+		</div>
+		<div class="form-row">
+			<label for="node-config-input-iotType"><i class="fa fa-tasks"></i> IoT Type</label>
+			<select id="node-config-input-iotType">
+				<option value="props">Properties</option>
+				<option value="event">Event</option>
+				<option value="service">Service</option>
+			</select>
+		</div>
+		<div class="form-row" style="margin-bottom:0;">
+			<label><i class="fa fa-list"></i> Field Structure</label>
+		</div>
+		<div class="form-row node-input-iot-container-row">
+			<ol id="node-config-input-fields-container"></ol>
+		</div>
+	</div>
+
+</script>
+
+<script type="text/javascript">
+
+	// Data Types
+	const dataTypes = [
+        { value: "TEXT", label: "TEXT", hasValue: false },
+        { value: "INT32", label: "INT32", hasValue: false },
+        { value: "FLOAT", label: "FLOAT", hasValue: false },
+        { value: "BOOLEAN", label: "BOOLEAN", hasValue: false },
+    ];
+
+	const optionHtml = dataTypes.map(({value,label})=>`<option value="${value}">${label}</option>\n`);
+
+    RED.nodes.registerType('hm-kafka-broker',{
+        category: 'config',
+        icon: "setting.png",
+        defaults: {
+        	name: {required:false},
+        	hosts: {required: true},
+
+			usesasl: {value: false},
+			saslmechanism: {value: 'plain'},
+			username: {required:false},
+			password: {required:false},
+
+			usetls: {value: false},
+			cacert: {required:false},
+			clientcert: {required:false},
+			privatekey: {required:false},
+			passphrase: {required:false},
+			selfsign: {value: false,required: false},
+
+			useiot: {value: false},
+			model: {required:false, value: "use"},
+			device: {required:false, value: "use"},
+			iotType: {required:false, value: "props"},
+			fields: {required:false, value: []},
+		},
+
+        label: function() {
+            return this.name||this._("hm-kafka-broker");
+		},
+		
+        labelStyle: function() {
+            return "node_label_italic";
+		},
+		
+  	    oneditprepare: function() {
+			const node = this;
+			function checkTls(){
+				if (!$("#node-config-input-usetls").is(':checked')) {
+					$("#node-config-tls").hide();
+				}
+				else{
+					$("#node-config-tls").show();
+				}
+			}
+
+			function checkSasl(){
+				if (!$("#node-config-input-usesasl").is(':checked')) {
+					$("#node-config-sasl").hide();
+				}
+				else{
+					$("#node-config-sasl").show();
+				}
+			}
+
+			function checkIot(){
+				if (!$("#node-config-input-useiot").is(':checked')) {
+					$("#node-config-iot").hide();
+				}
+				else{
+					$("#node-config-iot").show();
+				}
+			}
+
+			checkTls();
+			checkSasl();
+			checkIot();
+
+			$("#node-config-input-usetls").click(function(){
+				checkTls();
+			});
+
+			$("#node-config-input-usesasl").click(function(){
+				checkSasl();
+			});
+
+			$("#node-config-input-useiot").click(function(){
+				checkIot();
+			});
+
+			// Initialize IoT fields list
+			const fieldsContainer = $("#node-config-input-fields-container").css('min-height', '250px').css('min-width', '430px').editableList({
+				addItem: function (container, i, item) {
+					const row = $('<div/>').css({
+						overflow: 'hidden',
+						whiteSpace: 'nowrap',
+						display: 'flex'
+					}).appendTo(container);
+					const fieldNameCell = $('<div/>').css({ 'flex-grow': 1 }).appendTo(row);
+					const fieldName = $('<input/>', { class: "node-config-input-field-name", type: "text", style: "width: 100%", placeholder: "Field Name" })
+						.appendTo(fieldNameCell);
+
+					const dataTypeCell = $('<div/>').css({ 'flex-grow': 1, 'margin-left': '10px' }).appendTo(row);
+					const dataType = $(`<select class="node-config-input-field-type">${optionHtml}</select>`, { style: "width: 100%" })
+						.appendTo(dataTypeCell);
+
+					if (item) {
+						fieldName.val(item.fieldName || '');
+						dataType.val(item.dataType || 'TEXT');
+					}
+				},
+				sortable: true,
+				removable: true
+			});
+
+			if (node.fields && node.fields.length > 0) {
+				for (let i = 0; i < node.fields.length; i++) {
+					fieldsContainer.editableList('addItem', node.fields[i]);
+				}
+			}
+
+  		},
+		oneditsave: function() {
+			const node = this;
+			const fields = $("#node-config-input-fields-container").editableList('items');
+			node.fields = [];
+			fields.each(function (i) {
+				const item = $(this);
+				const fieldName = item.find(".node-config-input-field-name").val();
+				const dataType = item.find(".node-config-input-field-type").val();
+				if (fieldName) {
+					node.fields.push({
+						fieldName: fieldName,
+						dataType: dataType || 'TEXT'
+					});
+				}
+			});
+		},
+		oneditresize: function(size) {
+			const dlg = $("#dialog-form");
+			const expandRow = dlg.find('.node-input-iot-container-row');
+			let height = dlg.height() - 400;
+			if (expandRow && expandRow.length && $("#node-config-input-useiot").is(':checked')) {
+				const siblingRows = dlg.find('> .form-row:not(.node-input-iot-container-row)');
+				for (let i = 0; i < siblingRows.size(); i++) {
+					const cr = $(siblingRows[i]);
+					if (cr.is(":visible"))
+						height -= cr.outerHeight(true);
+				}
+				$("#node-config-input-fields-container").editableList('height', height);
+			}
+		}
+    });
+</script>

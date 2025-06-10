@@ -1,0 +1,50 @@
+{
+    "name": "@edgeflow/kafka-client",
+    "version": "1.0.3",
+    "description": "EdgeFlow Kafka Consumer and Producer",
+    "node-red": {
+        "version": ">=3.0.0",
+        "nodes": {
+            "hm-kafka-consumer": "./js/kafka-consumer.js",
+            "hm-kafka-producer": "./js/kafka-producer.js",
+            "hm-kafka-broker": "./js/kafka-broker.js"
+        },
+        "keywords":[
+            "node-red",
+            "kafka-producer",
+            "kafka-consumer",
+            "kafka-broker",
+            "kafka-node",
+            "big-data",
+            "edgeflow"
+        ]
+    },
+    "engines": {
+        "node": ">=14.6.0"
+    },
+    "keywords": [
+        "kafka-producer",
+        "kafka-consumer",
+        "node-red",
+        "kafka-broker",
+        "kafka-node",
+        "big-data",
+        "data"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/rootedge/edgeflow-kafka-client"
+    },
+    "bugs": {
+        "url": "https://github.com/rootedge/edgeflow-kafka-client/issues"
+    },
+    "homepage": "https://github.com/rootedge/edgeflow-kafka-client/blob/master/README.md",
+    "author": "Nicky<giscafer@outlook.com>",
+    "publishConfig": {
+        "access": "public"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "kafka-node": "^5.0.0"
+    }
+}

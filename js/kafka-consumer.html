@@ -1,0 +1,97 @@
+<script type="text/html" data-help-name="hm-kafka-consumer">
+    <p>A Kafka Consumer Group</p>
+</script>
+
+<script type="text/html" data-template-name="hm-kafka-consumer">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    
+    <div class="form-row">
+    	<label for="node-input-broker"><i class="fa fa-list-ul"></i> Broker</label>
+    	<input type="text" id="node-input-broker">
+    </div>
+      
+    <div class="form-row">
+        <label for="node-input-groupid"><i class="fa fa-tag"></i> Group Id (Optional)</label>
+        <input type="text" id="node-input-groupid" placeholder="e.g:'nodered_kafka_client_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'">
+    </div>
+    <div class="form-row">
+        <label for="node-input-topic"><i class="fa fa-tag"></i> Topic</label>
+        <input type="text" id="node-input-topic" placeholder="Topic">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-minbytes"><i class="fa fa-tag"></i> Min Bytes</label>
+        <input type="number" id="node-input-minbytes" placeholder="Default: 1" step=1000 min=1>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-maxbytes"><i class="fa fa-tag"></i> Max Bytes</label>
+        <input type="number" id="node-input-maxbytes" placeholder="Default: 1024*1024" step=1000 min=1>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-fromOffset"><i class="fa fa-tag"></i> From Offset</label>
+         <select id="node-input-fromOffset">
+         	<option value="latest">latest</option>
+         	<option value="earliest">earliest</option>
+         	<option value="none">none</option>
+         </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-outOfRangeOffset"><i class="fa fa-tag"></i> Out of Range Offset</label>
+         <select id="node-input-outOfRangeOffset">
+         	<option value="latest">earliest</option>
+         	<option value="earliest">latest</option>
+         	<option value="none">none</option>
+         </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-encoding"><i class="fa fa-tag"></i> Message encoding</label>
+         <select id="node-input-encoding">
+         	<option value="utf8">UTF-8</option>
+         	<option value="buffer">buffer</option>
+         </select>
+    </div>
+
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('hm-kafka-consumer',{
+        category: 'IOT',
+        paletteLabel: "Data Subscription",
+        color: '#00CED1',
+        defaults: {
+            name: {required:false},
+            broker: {type:"hm-kafka-broker"},
+            outOfRangeOffset: {value:"earliest"},
+            fromOffset: {value:"latest"},
+            topic: {required:true},
+            groupid: {required:false},
+            encoding: {value: "utf8"}
+        },
+        inputs:0,
+        outputs:1,
+        align: "left",
+        icon: "publish.png",
+        label: function() {
+            return this.name || this._("kafka-consumer");
+        },
+        labelStyle: function() {
+            return "node_label_italic";
+        },
+        oneditprepare: function() {
+
+        },
+        oneditsave: function() {
+
+        },
+        oneditresize: function(size) {
+
+        }
+    });
+</script>
