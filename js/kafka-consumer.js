@@ -105,21 +105,28 @@ module.exports = function(RED) {
         }
 
         node.on('close', function() {
+            node.debug(`[Kafka Consumer] Closing consumer for topic: ${config.topic}`);
             node.status({});
             clearInterval(node.interval);
-            node.consumerGroup.removeListener('connect', node.onConnect);
-            node.consumerGroup.removeListener('message', node.onMessage);
-            node.consumerGroup.removeListener('error', node.onError);
-            node.consumerGroup.removeListener('offsetOutOfRange', node.onError);
+            
+            if (node.consumerGroup) {
+                node.debug(`[Kafka Consumer] Removing event listeners`);
+                node.consumerGroup.removeListener('connect', node.onConnect);
+                node.consumerGroup.removeListener('message', node.onMessage);
+                node.consumerGroup.removeListener('error', node.onError);
+                node.consumerGroup.removeListener('offsetOutOfRange', node.onError);
 
-            node.consumerGroup.close(true, function(err) {
-                if(err){
-                    node.error(err);
-                    return;
-                }
+                node.debug(`[Kafka Consumer] Closing consumer group`);
+                node.consumerGroup.close(true, function(err) {
+                    if(err){
+                        node.error(`[Kafka Consumer] Error closing consumer group: ${err.message}`);
+                        return;
+                    }
 
-                node.consumerGroup = null;
-            });
+                    node.debug(`[Kafka Consumer] Consumer group closed successfully`);
+                    node.consumerGroup = null;
+                });
+            }
         });
 
         node.init();
