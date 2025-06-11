@@ -32,6 +32,14 @@ This guide explains how to use the comprehensive debug information added to the 
 - **Record Generation**: Shows how individual records are created
 - **Timestamp Generation**: Reports timestamp creation for messages
 
+### 5. Kafka Schema Producer (Publish with Schema)
+- **Schema Registry Connection**: Logs connection to Confluent Schema Registry
+- **Schema Retrieval/Registration**: Shows schema ID lookup and auto-registration
+- **Message Validation**: Reports Avro schema validation results
+- **Schema Caching**: Logs when schema IDs are cached for performance
+- **Encoding Process**: Shows message encoding with schema validation
+- **Validation-Only Mode**: Reports when operating in validation-only mode
+
 ## How to Enable Debug Logging
 
 ### Method 1: Node-RED Debug Panel
@@ -99,6 +107,15 @@ Look for these debug messages:
 [Utils] Field temperature (FLOAT): 25.5
 ```
 
+### 6. Schema Validation and Registry Issues
+```
+[Kafka Schema Producer] Schema Registry client created for: http://localhost:8081
+[Kafka Schema Producer] Retrieved existing schema ID: 1
+[Kafka Schema Producer] Message validated and encoded successfully
+[Kafka Schema Producer] Publishing validated message to topic: test-topic
+[Kafka Schema Producer] Message published successfully
+```
+
 ## Error Troubleshooting
 
 ### Connection Errors
@@ -118,6 +135,13 @@ Look for these debug messages:
 - Verify topic subscription
 - Look for offset out of range errors
 - Check message encoding settings
+
+### Schema Validation Errors
+- Check Schema Registry URL and connectivity
+- Verify schema subject exists or enable auto-registration
+- Validate message structure matches Avro schema
+- Check Schema Registry authentication credentials
+- Look for schema compatibility issues
 
 ## Performance Monitoring
 

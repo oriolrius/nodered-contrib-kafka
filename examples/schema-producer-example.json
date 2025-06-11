@@ -1,0 +1,103 @@
+{
+  "id": "example-schema-flow",
+  "label": "Example: Publish with Schema",
+  "nodes": [
+    {
+      "id": "inject-test",
+      "type": "inject",
+      "z": "example-flow",
+      "name": "Send Test Message",
+      "props": [
+        {
+          "p": "payload",
+          "v": "{\"id\":\"sensor-001\",\"message\":\"Temperature reading\",\"timestamp\":1640995200000}",
+          "vt": "json"
+        }
+      ],
+      "repeat": "",
+      "crontab": "",
+      "once": false,
+      "onceDelay": 0.1,
+      "topic": "",
+      "x": 140,
+      "y": 100,
+      "wires": [["schema-producer"]]
+    },
+    {
+      "id": "schema-producer",
+      "type": "hm-kafka-schema-producer",
+      "z": "example-flow",
+      "name": "Publish with Schema",
+      "broker": "kafka-broker",
+      "topic": "sensor-data",
+      "requireAcks": 1,
+      "ackTimeoutMs": 1000,
+      "registryUrl": "http://localhost:8081",
+      "schemaSubject": "sensor-data-value",
+      "useRegistryAuth": false,
+      "registryUsername": "",
+      "registryPassword": "",
+      "autoRegister": true,
+      "autoSchema": "{\"type\":\"record\",\"name\":\"SensorData\",\"fields\":[{\"name\":\"id\",\"type\":\"string\"},{\"name\":\"message\",\"type\":\"string\"},{\"name\":\"timestamp\",\"type\":\"long\"},{\"name\":\"value\",\"type\":[\"null\",\"float\"],\"default\":null}]}",
+      "validateOnly": false,
+      "x": 360,
+      "y": 100,
+      "wires": [["debug-success"], ["debug-error"]]
+    },
+    {
+      "id": "debug-success",
+      "type": "debug",
+      "z": "example-flow",
+      "name": "Success",
+      "active": true,
+      "tosidebar": true,
+      "console": false,
+      "tostatus": false,
+      "complete": "payload",
+      "targetType": "msg",
+      "statusVal": "",
+      "statusType": "auto",
+      "x": 580,
+      "y": 80,
+      "wires": []
+    },
+    {
+      "id": "debug-error",
+      "type": "debug",
+      "z": "example-flow",
+      "name": "Error",
+      "active": true,
+      "tosidebar": true,
+      "console": false,
+      "tostatus": false,
+      "complete": "payload",
+      "targetType": "msg",
+      "statusVal": "",
+      "statusType": "auto",
+      "x": 570,
+      "y": 120,
+      "wires": []
+    },
+    {
+      "id": "kafka-broker",
+      "type": "hm-kafka-broker",
+      "name": "Local Kafka",
+      "hosts": "localhost:9092",
+      "useTLS": false,
+      "caCert": "",
+      "clientCert": "",
+      "privateKey": "",
+      "passphrase": "",
+      "selfSign": false,
+      "useSASL": false,
+      "saslMechanism": "plain",
+      "saslUsername": "",
+      "saslPassword": "",
+      "useiot": false,
+      "model": "",
+      "device": "",
+      "iotType": "props",
+      "fields": []
+    }
+  ]
+}

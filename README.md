@@ -19,11 +19,21 @@ This Node-RED Kafka client is based on the original `node-red-contrib-kafka` imp
 - **Active Maintenance**: Built on actively maintained libraries for long-term reliability
 - **IoT Integration**: Added specialized IoT cloud configuration features
 
-This node can be used to produce and consume messages to/from Kafka. It consists of three nodes:
+This node can be used to produce and consume messages to/from Kafka. It consists of four nodes:
 
 - hm-kafka-broker
 - hm-kafka-producer
 - hm-kafka-consumer
+- hm-kafka-schema-producer (NEW)
+
+### Schema Registry Support
+
+**NEW**: The `hm-kafka-schema-producer` node adds Avro schema validation support using Confluent Schema Registry. This node:
+- Validates message payloads against registered Avro schemas
+- Supports automatic schema registration if schema doesn't exist
+- Provides schema-only validation mode for testing
+- Integrates with Confluent Schema Registry authentication
+- Ensures data consistency and compatibility across your Kafka ecosystem
 
 ### SASL Authentication Support
 
@@ -87,6 +97,47 @@ Topic name of selected broker which is wanted to be consume
 'latest', 'none' or 'earliest' options can be selected
 #### Out of Range Offset
 'latest', 'none' or 'earliest' options can be selected
+
+### kafka-schema-producer (Publish with Schema)
+
+#### Name (Optional)
+Name wanted to be shown in Node
+
+#### Broker
+Broker which is wanted to be connected
+
+#### Topic
+Topic name of selected broker which messages will be published to
+
+#### Require Ack
+Default value is 1. 0 can be set if Acknowledge is not required.
+
+#### Ack Timeout (Ms)
+Timeout of acknowledge response in milliseconds.
+
+#### Registry URL
+Confluent Schema Registry URL (e.g., http://localhost:8081)
+
+#### Schema Subject
+The subject name for the Avro schema in the registry (e.g., my-topic-value)
+
+#### Use Registry Authentication
+Check if authentication is required for Schema Registry
+
+#### Registry Username (Optional)
+Username for Schema Registry authentication
+
+#### Registry Password (Optional)
+Password for Schema Registry authentication
+
+#### Auto-register schema if not found
+Check to automatically register the schema if it doesn't exist in the registry
+
+#### Default Schema (JSON)
+Avro schema definition in JSON format used for auto-registration
+
+#### Validate schema only
+Check to only validate the message against the schema without publishing to Kafka
 
 ## Installation
 ```

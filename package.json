@@ -7,9 +7,10 @@
         "nodes": {
             "hm-kafka-consumer": "./js/kafka-consumer.js",
             "hm-kafka-producer": "./js/kafka-producer.js",
-            "hm-kafka-broker": "./js/kafka-broker.js"
+            "hm-kafka-broker": "./js/kafka-broker.js",
+            "hm-kafka-schema-producer": "./js/kafka-schema-producer.js"
         },
-        "keywords":[
+        "keywords": [
             "node-red",
             "kafka-producer",
             "kafka-consumer",
@@ -45,6 +46,7 @@
     },
     "license": "MIT",
     "dependencies": {
+        "@kafkajs/confluent-schema-registry": "^3.9.0",
         "kafkajs": "^2.2.4"
     }
 }
