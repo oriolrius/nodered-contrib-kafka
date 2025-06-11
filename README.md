@@ -1,16 +1,38 @@
-# @edgeflow/kafka-client
+# @oriolrius/kafka
 
-[![@edgeflow/kafka-client](https://img.shields.io/npm/v/@edgeflow/kafka-client?style=flat&colorA=080f12&colorB=1fa669)](https://www.npmjs.com/package/@edgeflow/kafka-client)
+Kafka Consumer and Producer
 
-EdgeFlow Kafka Consumer and Producer
+## Acknowledgments
 
-This node can be used in order to produce and consume messages to Kafka. It is highly depends on 'kafkajs' library. Consists three nodes.
+We extend our sincere gratitude to the original creators and contributors of the Node-RED Kafka integration projects that served as the foundation for this work. This project builds upon the excellent groundwork laid by the Node-RED community in creating Kafka connectivity solutions.
+
+## About This Project
+
+This Node-RED Kafka client is based on the original `node-red-contrib-kafka` implementations but has been completely modernized and enhanced. **We have migrated from the legacy `kafka-node` library to the modern `kafkajs` library** for better performance, reliability, and active maintenance support.
+
+### Key Improvements Over Original Projects
+
+- **Modern Library**: Uses `kafkajs` instead of the deprecated `kafka-node`
+- **Enhanced SASL Support**: Better SASL authentication with support for PLAIN, SCRAM-SHA-256, and SCRAM-SHA-512 mechanisms
+- **Improved SSL/TLS**: Enhanced certificate handling and SSL configuration options
+- **Better Error Handling**: More detailed error reporting and debugging capabilities
+- **Active Maintenance**: Built on actively maintained libraries for long-term reliability
+- **IoT Integration**: Added specialized IoT cloud configuration features
+
+This node can be used to produce and consume messages to/from Kafka. It consists of three nodes:
 
 - hm-kafka-broker
 - hm-kafka-producer
-- hm-karka-consumer
+- hm-kafka-consumer
 
-Note: This library add sasl/plain supports base on kafkajs project. Now supports SCRAM-SHA-256 and SCRAM-SHA-512 authentication mechanisms.
+### SASL Authentication Support
+
+This library provides comprehensive SASL authentication support based on the `kafkajs` project. It now supports:
+- **PLAIN** - Basic username/password authentication
+- **SCRAM-SHA-256** - Secure password authentication with SHA-256
+- **SCRAM-SHA-512** - Secure password authentication with SHA-512
+
+These enhanced authentication mechanisms provide better security compared to the original `kafka-node` implementations.
 
 ## Input Parameters
 ### kafka-broker
@@ -305,3 +327,24 @@ flows code
     }
 ]
 ```
+
+## License
+
+This project is licensed under the MIT License - the same license as the original Node-RED Kafka projects that served as its foundation.
+
+## Acknowledgments
+
+We extend our sincere gratitude to the original creators and contributors of the Node-RED Kafka integration projects that served as the foundation for this work. This project builds upon the excellent groundwork laid by the Node-RED community in creating Kafka connectivity solutions.
+
+**Migration from kafka-node to kafkajs**: This Node-RED Kafka client is based on the original `node-red-contrib-kafka` implementations but has been completely modernized. We have migrated from the legacy `kafka-node` library to the modern `kafkajs` library for better performance, reliability, and active maintenance support.
+
+### Key Improvements Over Original Projects
+
+- **Modern Library**: Uses `kafkajs` instead of the deprecated `kafka-node`
+- **Enhanced SASL Support**: Better SASL authentication with support for PLAIN, SCRAM-SHA-256, and SCRAM-SHA-512 mechanisms  
+- **Improved SSL/TLS**: Enhanced certificate handling and SSL configuration options
+- **Better Error Handling**: More detailed error reporting and debugging capabilities
+- **Active Maintenance**: Built on actively maintained libraries for long-term reliability
+- **IoT Integration**: Added specialized IoT cloud configuration features
+
+The enhanced SASL authentication mechanisms provide significantly better security compared to the original `kafka-node` implementations, making this solution more suitable for production environments.
