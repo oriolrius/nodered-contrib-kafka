@@ -1,6 +1,6 @@
 {
-    "name": "@edgeflow/kafka-client",
-    "version": "2.0.0",
+    "name": "@oriolrius/kafka",
+    "version": "3.0.0",
     "description": "Node-RED Kafka nodes: Send, Receive, and Schema validation with modern KafkaJS",
     "node-red": {
         "version": ">=3.0.0",

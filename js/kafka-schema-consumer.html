@@ -206,22 +206,14 @@
             processingTimeout: {value: 30000}
         },
         inputs:0,
-        outputs: function() {
-            return this.enableMultiOutput ? 2 : 1;
-        },
+        outputs:2,
         align: "left",
-        icon: "bridge.png",
+        icon: "publish.png",
         label: function() {
             return this.name || "Kafka Schema Receive";
         },
         labelStyle: function() {
             return "node_label_italic";
-        },
-        outputLabels: function() {
-            if (this.enableMultiOutput) {
-                return ["Valid Messages", "Invalid Messages"];
-            }
-            return ["Messages"];
         },
         oneditprepare: function() {
             // Show/hide registry auth fields
@@ -242,17 +234,6 @@
                 }
             });
 
-            // Handle multi-output configuration
-            $("#node-input-enableMultiOutput").change(function() {
-                // Update the outputs count dynamically
-                if ($(this).is(":checked")) {
-                    // Enable multi-output mode
-                    console.log("Multi-output enabled");
-                } else {
-                    console.log("Multi-output disabled");
-                }
-            });
-
             // Initialize visibility based on current values
             if (this.useRegistryAuth) {
                 $("#node-config-registry-auth").show();
@@ -260,12 +241,6 @@
             if (this.autoRegisterSchema) {
                 $("#node-config-auto-schema").show();
             }
-        },
-        oneditsave: function() {
-
-        },
-        oneditresize: function(size) {
-
         }
     });
 </script>
