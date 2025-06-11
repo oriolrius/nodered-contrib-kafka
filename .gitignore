@@ -118,6 +118,8 @@ Thumbs.db
 # Test artifacts
 test-results/
 coverage/
+tests/test-results/
+tests/coverage/
 
 # Build artifacts
 build/

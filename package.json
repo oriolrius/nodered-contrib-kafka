@@ -45,6 +45,13 @@
         "access": "public"
     },
     "license": "MIT",
+    "scripts": {
+        "test": "node tests/run-tests.js",
+        "test:individual": "node tests/comprehensive-test.js && node tests/test-node-loading.js && node tests/test-schema-producer.js",
+        "test:comprehensive": "node tests/comprehensive-test.js",
+        "test:loading": "node tests/test-node-loading.js",
+        "test:schema": "node tests/test-schema-producer.js"
+    },
     "dependencies": {
         "@kafkajs/confluent-schema-registry": "^3.9.0",
         "kafkajs": "^2.2.4"

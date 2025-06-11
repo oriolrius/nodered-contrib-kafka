@@ -68,7 +68,7 @@ try {
     };
     
     // Load the module
-    const schemaProducerModule = require('./js/kafka-schema-producer.js');
+    const schemaProducerModule = require('../js/kafka-schema-producer.js');
     schemaProducerModule(RED);
     
 } catch (error) {

@@ -52,7 +52,7 @@ try {
     console.log('='.repeat(50));
     
     // Load the schema producer module
-    const schemaProducerModule = require('./js/kafka-schema-producer.js');
+    const schemaProducerModule = require('../js/kafka-schema-producer.js');
     
     // Call the module with mock RED
     schemaProducerModule(RED);
