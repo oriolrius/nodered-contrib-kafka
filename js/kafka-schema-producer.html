@@ -1,7 +1,8 @@
 <script type="text/html" data-help-name="hm-kafka-schema-producer">
-    <p>Publish messages to Kafka with Avro schema validation using Confluent Schema Registry</p>
-    <p>This node validates the message payload against a registered Avro schema before publishing to Kafka.</p>
-    <p>On successful schema validation and message publishing, outputs the result. On failure, sends error to the catch node.</p>
+    <p>Send messages to Kafka with Avro schema validation using Confluent Schema Registry.</p>
+    <p>This node validates message payloads against registered Avro schemas before publishing to Kafka.</p>
+    <p>Supports automatic schema registration, schema-only validation mode, and Schema Registry authentication.</p>
+    <p>On successful validation and publishing, outputs the result. On failure, sends error details.</p>
 </script>
 
 <script type="text/html" data-template-name="hm-kafka-schema-producer">
@@ -85,7 +86,7 @@
 <script type="text/javascript">
     RED.nodes.registerType('hm-kafka-schema-producer', {
         category: 'IOT',
-        paletteLabel: "Publish with Schema",
+        paletteLabel: "Kafka Schema Send",
         color: '#FF6B6B',
         defaults: {
             name: { required: false },
@@ -107,7 +108,7 @@
         outputs: 1,
         icon: "file.png",
         label: function () {
-            return this.name || "Publish with Schema";
+            return this.name || "Kafka Schema Send";
         },
         oneditprepare: function() {
             // Show/hide registry auth fields

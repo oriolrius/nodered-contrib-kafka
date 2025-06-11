@@ -1,6 +1,8 @@
 <script type="text/html" data-help-name="hm-kafka-producer">
-    <p>Get a connection for the message to be used in following nodes</p>
-    <p>On successfully getting connection message sent OK out otherwise send to failed connector</p>
+    <p>Send messages to a Kafka topic.</p>
+    <p>This node publishes the incoming message payload to the specified Kafka topic.</p>
+    <p>Supports message compression, acknowledgment settings, and IoT cloud data formatting.</p>
+    <p>On successful send, the node status shows "Sending". On failure, shows "Error".</p>
 </script>
 
 <script type="text/html" data-template-name="hm-kafka-producer">
@@ -82,7 +84,7 @@
 <script type="text/javascript">
     RED.nodes.registerType('hm-kafka-producer', {
         category: 'IOT',
-        paletteLabel: "Data to Cloud",
+        paletteLabel: "Kafka Send",
         color: '#00CED1',
         defaults: {
             name: { required: false },
@@ -105,7 +107,7 @@
         icon: "publish.png",
         allign: "right",
         label: function () {
-            return this.name || "Data to Cloud";
+            return this.name || "Kafka Send";
         },
         labelStyle: function () {
             return "node_label_italic";

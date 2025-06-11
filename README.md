@@ -21,10 +21,10 @@ This Node-RED Kafka client is based on the original `node-red-contrib-kafka` imp
 
 This node can be used to produce and consume messages to/from Kafka. It consists of four nodes:
 
-- hm-kafka-broker
-- hm-kafka-producer
-- hm-kafka-consumer
-- hm-kafka-schema-producer (NEW)
+- **Kafka Broker** (hm-kafka-broker) - Connection configuration
+- **Kafka Send** (hm-kafka-producer) - Send messages to Kafka topics  
+- **Kafka Receive** (hm-kafka-consumer) - Receive messages from Kafka topics
+- **Kafka Schema Send** (hm-kafka-schema-producer) - Send messages with Avro schema validation
 
 ### Schema Registry Support
 
@@ -45,60 +45,106 @@ This library provides comprehensive SASL authentication support based on the `ka
 These enhanced authentication mechanisms provide better security compared to the original `kafka-node` implementations.
 
 ## Input Parameters
-### kafka-broker
+
+### Kafka Broker (Connection Configuration)
+
 #### Name (Optional)
+
 Name wanted to be shown in Node
+
 #### Hosts
+
 Host names comma delimited (Multiple host is provided)
+
 #### Use TLS
-Check if tls security is required for Kafka Cluster
+
+Check if TLS security is required for Kafka Cluster
+
 #### CA Certs (Optional)
+
 CA Root certificate path defined in Kafka Cluster
+
 #### Client Cert (Optional)
+
 Client cert path created by openssl derived from Private Key (pem)
+
 #### Private Key (Optional)
+
 Private Key path created by openssl (pem)
-#### Passphare (Optional)
+
+#### Passphrase (Optional)
+
 Passphrase of created private Key
+
 #### Self Sign
+
 Check if want to be allowed untrusted certificates
 
 #### Use SASL
+
 Check if SASL security is required for Kafka Cluster
+
 #### SASL Mechanism
+
 Select the SASL authentication mechanism: PLAIN, SCRAM-SHA-256, or SCRAM-SHA-512
+
 #### SASL Username (Optional)
+
 SASL Username
+
 #### SASL Password (Optional)
+
 SASL Password
 
-### kafka-producer
+### Kafka Send (Producer)
+
 #### Name (Optional)
-Name wanted to be shown in NodeRename your node
+
+Name wanted to be shown in Node
+
 #### Broker
-Broker which is wanted to be connect
+
+Broker which is wanted to be connected
+
 #### Topic
-Topic name of selected broker which is wanted to be consume
+
+Topic name of selected broker which messages will be published to
+
 #### Require Ack
-Default value is 1. 0 can be past if Acknowledge is not required.
+
+Default value is 1. 0 can be set if Acknowledge is not required.
+
 #### Ack Timeout
+
 Timeout of acknowledge response.
-#### Attiributes
+
+#### Attributes
+
 Can be selected if compression is important
 
-### kafka-consumer
+### Kafka Receive (Consumer)
+
 #### Name (Optional)
-Name wanted to be shown in NodeRename your node
+
+Name wanted to be shown in Node
+
 #### Broker
-Broker which is wanted to be connect
+
+Broker which is wanted to be connected
+
 #### Topic
-Topic name of selected broker which is wanted to be consume
+
+Topic name of selected broker which is wanted to be consumed
+
 #### From Offset
-'latest', 'none' or 'earliest' options can be selected
-#### Out of Range Offset
+
 'latest', 'none' or 'earliest' options can be selected
 
-### kafka-schema-producer (Publish with Schema)
+#### Out of Range Offset
+
+'latest', 'none' or 'earliest' options can be selected
+
+### Kafka Schema Send (Schema Producer)
 
 #### Name (Optional)
 Name wanted to be shown in Node
@@ -378,6 +424,22 @@ flows code
     }
 ]
 ```
+
+## Documentation
+
+This project includes comprehensive documentation to help you get started and understand all features:
+
+### Getting Started
+- **[Schema Guide](docs/SCHEMA_GUIDE.md)** - Complete guide to using Avro schema validation with the Schema Producer node
+- **[Migration Guide](docs/MIGRATION_GUIDE.md)** - Guide for migrating from legacy kafka-node based implementations
+
+### Development & Implementation
+- **[Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)** - Technical overview of the project's architecture and components
+- **[Debug Guide](docs/DEBUG_GUIDE.md)** - Troubleshooting and debugging information for common issues
+
+### Improvements & Features
+- **[Schema Producer Status Improvements](docs/SCHEMA_PRODUCER_STATUS_IMPROVEMENTS.md)** - Details about status reporting enhancements in the Schema Producer
+- **[Node Names Improvement](docs/NODE_NAMES_IMPROVEMENT.md)** - Information about node naming conventions and improvements
 
 ## License
 

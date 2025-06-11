@@ -1,6 +1,6 @@
 {
   "id": "example-schema-flow",
-  "label": "Example: Publish with Schema",
+  "label": "Example: Kafka Schema Send",
   "nodes": [
     {
       "id": "inject-test",
@@ -27,7 +27,7 @@
       "id": "schema-producer",
       "type": "hm-kafka-schema-producer",
       "z": "example-flow",
-      "name": "Publish with Schema",
+      "name": "Kafka Schema Send",
       "broker": "kafka-broker",
       "topic": "sensor-data",
       "requireAcks": 1,

@@ -1,5 +1,8 @@
 <script type="text/html" data-help-name="hm-kafka-consumer">
-    <p>A Kafka Consumer Group</p>
+    <p>Receive messages from a Kafka topic.</p>
+    <p>This node subscribes to a Kafka topic and outputs received messages as msg.payload.</p>
+    <p>Messages include topic, partition, offset, key, value, and timestamp information.</p>
+    <p>Supports configurable consumer groups, offset management, and message encoding options.</p>
 </script>
 
 <script type="text/html" data-template-name="hm-kafka-consumer">
@@ -63,7 +66,7 @@
 <script type="text/javascript">
     RED.nodes.registerType('hm-kafka-consumer',{
         category: 'IOT',
-        paletteLabel: "Data Subscription",
+        paletteLabel: "Kafka Receive",
         color: '#00CED1',
         defaults: {
             name: {required:false},
@@ -79,7 +82,7 @@
         align: "left",
         icon: "publish.png",
         label: function() {
-            return this.name || this._("kafka-consumer");
+            return this.name || "Kafka Receive";
         },
         labelStyle: function() {
             return "node_label_italic";

@@ -1,8 +1,8 @@
 <script type="text/html" data-help-name="hm-kafka-broker">
-    <p>Define a hm-kafka-broker. </p>
-    <p>"Hosts process.env name" can contain a process.env property name that contained hosts as JSON string,e.g.</p>
-    <textarea>process.env.atesthosts='[{"host":"atesthost1","port":1234},{"host":"atesthost2","port":4321}]';</textarea>
-    <p>Note, minimal data quality checks performed.</p>
+    <p>Configure connection settings for Kafka cluster.</p>
+    <p>This node defines the broker configuration that will be used by Kafka Send, Kafka Receive, and Kafka Schema Send nodes.</p>
+    <p>"Hosts" can contain multiple brokers separated by commas, e.g.: localhost:9092,broker2:9092</p>
+    <p>Supports SASL authentication (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512) and TLS/SSL encryption.</p>
 </script>
 
 <script type="text/html" data-template-name="hm-kafka-broker">
@@ -147,8 +147,9 @@
 			fields: {required:false, value: []},
 		},
 
+        paletteLabel: "Kafka Broker",
         label: function() {
-            return this.name||this._("hm-kafka-broker");
+            return this.name || "Kafka Broker";
 		},
 		
         labelStyle: function() {

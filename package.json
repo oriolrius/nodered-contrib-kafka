@@ -1,7 +1,7 @@
 {
     "name": "@edgeflow/kafka-client",
     "version": "2.0.0",
-    "description": "EdgeFlow Kafka Consumer and Producer",
+    "description": "Node-RED Kafka nodes: Send, Receive, and Schema validation with modern KafkaJS",
     "node-red": {
         "version": ">=3.0.0",
         "nodes": {
