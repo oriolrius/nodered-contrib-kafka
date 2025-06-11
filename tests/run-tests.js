@@ -19,6 +19,7 @@ console.log('JS directory:', jsDir);
 // Check if required files exist
 const requiredFiles = [
     path.join(jsDir, 'kafka-schema-producer.js'),
+    path.join(jsDir, 'kafka-schema-consumer.js'),
     path.join(jsDir, 'kafka-consumer.js'),
     path.join(jsDir, 'kafka-producer.js'),
     path.join(jsDir, 'kafka-broker.js')
@@ -37,7 +38,8 @@ requiredFiles.forEach(file => {
 const tests = [
     'test-node-loading.js',
     'comprehensive-test.js',
-    'test-schema-producer.js'
+    'test-schema-producer.js',
+    'test-schema-consumer.js'
 ];
 
 console.log('\n📋 Available tests:');
