@@ -104,11 +104,29 @@ module.exports = function (RED) {
         node.on('input', async function (msg) {
             node.debug(`[Kafka Producer] Received input message`);
             
+            // Dynamic configuration support
+            const dynamicConfig = {
+                topic: msg.topic || config.topic,
+                requireAcks: msg.requireAcks !== undefined ? msg.requireAcks : config.requireAcks,
+                ackTimeoutMs: msg.ackTimeoutMs || config.ackTimeoutMs,
+                attributes: msg.attributes !== undefined ? msg.attributes : config.attributes,
+                useiot: msg.useiot !== undefined ? msg.useiot : config.useiot
+            };
+            
+            // Update IoT options from message if provided
             if (msg.broker) {
                 // Pass-through parameters, such as model, device, iotType, etc.
                 iotOptions = { ...iotOptions, ...msg.broker };
                 node.debug(`[Kafka Producer] Updated IoT options from message: ${JSON.stringify(msg.broker)}`);
             }
+            
+            // Support dynamic IoT configuration
+            if (msg.iot) {
+                iotOptions = { ...iotOptions, ...msg.iot };
+                node.debug(`[Kafka Producer] Updated IoT options from msg.iot: ${JSON.stringify(msg.iot)}`);
+            }
+            
+            node.debug(`[Kafka Producer] Using dynamic config - Topic: ${dynamicConfig.topic}, RequireAcks: ${dynamicConfig.requireAcks}, UseIoT: ${dynamicConfig.useiot}`);
             
             if (!node.ready) {
                 node.warn(`[Kafka Producer] Producer not ready, discarding message`);
@@ -124,10 +142,10 @@ module.exports = function (RED) {
                     2: 'snappy'
                 };
                 
-                node.debug(`[Kafka Producer] Preparing message for topic: ${config.topic}`);
-                node.debug(`[Kafka Producer] Compression type: ${compressionTypes[config.attributes] || 'none'}`);
+                node.debug(`[Kafka Producer] Preparing message for topic: ${dynamicConfig.topic}`);
+                node.debug(`[Kafka Producer] Compression type: ${compressionTypes[dynamicConfig.attributes] || 'none'}`);
                 
-                if (config.useiot || iotOptions.useiot) {
+                if (dynamicConfig.useiot || iotOptions.useiot) {
                     node.debug(`[Kafka Producer] Processing message in IoT format`);
                     try {
                         const nameTypes = getNameTypes(iotOptions.fields);
@@ -153,22 +171,24 @@ module.exports = function (RED) {
                 }
 
                 const kafkaMessage = {
-                    topic: config.topic,
+                    topic: dynamicConfig.topic,
                     messages: [{
-                        value: messageValue
+                        value: messageValue,
+                        key: msg.key, // Support dynamic key
+                        headers: msg.headers // Support dynamic headers
                     }]
                 };
 
                 // Add compression if specified
-                if (config.attributes && config.attributes > 0) {
-                    kafkaMessage.compression = compressionTypes[config.attributes];
+                if (dynamicConfig.attributes && dynamicConfig.attributes > 0) {
+                    kafkaMessage.compression = compressionTypes[dynamicConfig.attributes];
                 }
 
                 node.debug(`[Kafka Producer] Sending message to Kafka`);
                 try {
                     await node.producer.send(kafkaMessage);
                     node.lastMessageTime = new Date().getTime();
-                    node.debug(`[Kafka Producer] Message sent successfully to topic: ${config.topic}`);
+                    node.debug(`[Kafka Producer] Message sent successfully to topic: ${dynamicConfig.topic}`);
                     node.status({ fill: "blue", shape: "ring", text: "Sending" });
                 } catch (err) {
                     node.lastMessageTime = null;

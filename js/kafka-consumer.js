@@ -66,12 +66,35 @@ module.exports = function(RED) {
             
             node.onMessage = async function({ topic, partition, message }){
                 node.lastMessageTime = new Date().getTime();
-                const value = config.encoding === 'buffer' ? message.value : message.value.toString();
+                
+                // Check for dynamic configuration in message headers
+                let dynamicConfig = {
+                    encoding: config.encoding,
+                    includeHeaders: false,
+                    includeMetadata: false
+                };
+                
+                if (message.headers) {
+                    if (message.headers['x-encoding']) {
+                        dynamicConfig.encoding = message.headers['x-encoding'].toString();
+                        node.debug(`[Kafka Consumer] Using dynamic encoding from headers: ${dynamicConfig.encoding}`);
+                    }
+                    if (message.headers['x-include-headers']) {
+                        dynamicConfig.includeHeaders = message.headers['x-include-headers'].toString() === 'true';
+                        node.debug(`[Kafka Consumer] Using dynamic include headers: ${dynamicConfig.includeHeaders}`);
+                    }
+                    if (message.headers['x-include-metadata']) {
+                        dynamicConfig.includeMetadata = message.headers['x-include-metadata'].toString() === 'true';
+                        node.debug(`[Kafka Consumer] Using dynamic include metadata: ${dynamicConfig.includeMetadata}`);
+                    }
+                }
+                
+                const value = dynamicConfig.encoding === 'buffer' ? message.value : message.value.toString();
                 node.debug(`[Kafka Consumer] Received message from topic ${topic}, partition ${partition}, offset ${message.offset}`);
-                node.debug(`[Kafka Consumer] Message value: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+                node.debug(`[Kafka Consumer] Message value: ${typeof value === 'string' ? value : JSON.stringify(value)} (encoding: ${dynamicConfig.encoding})`);
                 
                 // Create message object similar to kafka-node format
-                const messageObj = {
+                let messageObj = {
                     topic: topic,
                     partition: partition,
                     offset: message.offset,
@@ -79,6 +102,24 @@ module.exports = function(RED) {
                     value: value,
                     timestamp: message.timestamp
                 };
+                
+                // Add headers if requested dynamically
+                if (dynamicConfig.includeHeaders && message.headers) {
+                    messageObj.headers = message.headers;
+                }
+                
+                // Add additional metadata if requested dynamically
+                if (dynamicConfig.includeMetadata) {
+                    messageObj.metadata = {
+                        valueSize: message.value ? message.value.length : 0,
+                        keySize: message.key ? message.key.length : 0,
+                        dynamicConfig: dynamicConfig.encoding !== config.encoding || dynamicConfig.includeHeaders || dynamicConfig.includeMetadata ? {
+                            encoding: dynamicConfig.encoding,
+                            includeHeaders: dynamicConfig.includeHeaders,
+                            includeMetadata: dynamicConfig.includeMetadata
+                        } : undefined
+                    };
+                }
                 
                 var msg = { payload: messageObj };
                 node.send(msg);

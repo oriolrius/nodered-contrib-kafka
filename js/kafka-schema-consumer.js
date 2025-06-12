@@ -75,7 +75,7 @@ module.exports = function(RED) {
 
             // Get or register schema if needed
             try {
-                await node.getOrRegisterSchema();
+                const { schemaId } = await node.getOrRegisterSchema();
                 node.status({fill:"yellow",shape:"ring",text:"Schema validated"});
             } catch (error) {
                 node.error(`[Kafka Schema Consumer] Schema validation failed: ${error.message}`);
@@ -142,9 +142,48 @@ module.exports = function(RED) {
                 node.lastMessageTime = messageStartTime;
                 node.debug(`[Kafka Schema Consumer] Received message from topic ${topic}, partition ${partition}, offset ${message.offset}`);
                 
+                // Check for dynamic configuration in message headers
+                let dynamicConfig = {
+                    schemaSubject: config.schemaSubject,
+                    registryUrl: config.registryUrl,
+                    skipInvalidMessages: config.skipInvalidMessages,
+                    outputRawMessage: config.outputRawMessage
+                };
+                
+                if (message.headers) {
+                    if (message.headers['x-schema-subject']) {
+                        dynamicConfig.schemaSubject = message.headers['x-schema-subject'].toString();
+                        node.debug(`[Kafka Schema Consumer] Using dynamic schema subject from headers: ${dynamicConfig.schemaSubject}`);
+                    }
+                    if (message.headers['x-registry-url']) {
+                        dynamicConfig.registryUrl = message.headers['x-registry-url'].toString();
+                        node.debug(`[Kafka Schema Consumer] Using dynamic registry URL from headers: ${dynamicConfig.registryUrl}`);
+                    }
+                    if (message.headers['x-skip-invalid']) {
+                        dynamicConfig.skipInvalidMessages = message.headers['x-skip-invalid'].toString() === 'true';
+                        node.debug(`[Kafka Schema Consumer] Using dynamic skip invalid messages: ${dynamicConfig.skipInvalidMessages}`);
+                    }
+                    if (message.headers['x-output-raw']) {
+                        dynamicConfig.outputRawMessage = message.headers['x-output-raw'].toString() === 'true';
+                        node.debug(`[Kafka Schema Consumer] Using dynamic output raw message: ${dynamicConfig.outputRawMessage}`);
+                    }
+                }
+                
                 try {
+                    // Get appropriate registry client and schema ID
+                    let registryClient = node.schemaRegistry;
+                    let useCache = true;
+                    
+                    // If dynamic configuration is used, get schema accordingly
+                    if (dynamicConfig.schemaSubject !== config.schemaSubject || dynamicConfig.registryUrl !== config.registryUrl) {
+                        const schemaInfo = await node.getOrRegisterSchema(dynamicConfig.schemaSubject, dynamicConfig.registryUrl);
+                        registryClient = schemaInfo.registryClient;
+                        useCache = false; // Don't use cache for dynamic configs
+                        node.debug(`[Kafka Schema Consumer] Using dynamic schema configuration`);
+                    }
+                    
                     // Decode the Avro message
-                    const decodedValue = await node.schemaRegistry.decode(message.value);
+                    const decodedValue = await registryClient.decode(message.value);
                     const processingTime = Date.now() - messageStartTime;
                     
                     // Update performance metrics if enabled
@@ -157,7 +196,7 @@ module.exports = function(RED) {
                         await node.trackSchemaChange(message.value);
                     }
                     
-                    node.debug(`[Kafka Schema Consumer] Message decoded successfully in ${processingTime}ms`);
+                    node.debug(`[Kafka Schema Consumer] Message decoded successfully in ${processingTime}ms using subject: ${dynamicConfig.schemaSubject}`);
                     node.debug(`[Kafka Schema Consumer] Decoded value: ${JSON.stringify(decodedValue)}`);
                     
                     // Create message object
@@ -166,7 +205,7 @@ module.exports = function(RED) {
                     };
 
                     // Include raw message metadata if requested
-                    if (config.outputRawMessage) {
+                    if (dynamicConfig.outputRawMessage) {
                         messageObj.kafkaMessage = {
                             topic: topic,
                             partition: partition,
@@ -174,7 +213,11 @@ module.exports = function(RED) {
                             key: message.key ? message.key.toString() : null,
                             timestamp: message.timestamp,
                             headers: message.headers || {},
-                            processingTime: config.enableMetrics ? processingTime : undefined
+                            processingTime: config.enableMetrics ? processingTime : undefined,
+                            dynamicConfig: dynamicConfig.schemaSubject !== config.schemaSubject || dynamicConfig.registryUrl !== config.registryUrl ? {
+                                schemaSubject: dynamicConfig.schemaSubject,
+                                registryUrl: dynamicConfig.registryUrl
+                            } : undefined
                         };
                     }
                     
@@ -199,7 +242,11 @@ module.exports = function(RED) {
                     node.error(`[Kafka Schema Consumer] Failed to decode message: ${decodeError.message}`);
                     node.debug(`[Kafka Schema Consumer] Decode error details: ${JSON.stringify(decodeError, null, 2)}`);
                     
-                    if (config.skipInvalidMessages) {
+                    // Check dynamic configuration for skip invalid messages
+                    const skipInvalid = message.headers && message.headers['x-skip-invalid'] ? 
+                        message.headers['x-skip-invalid'].toString() === 'true' : config.skipInvalidMessages;
+                    
+                    if (skipInvalid) {
                         node.warn(`[Kafka Schema Consumer] Skipping invalid message at offset ${message.offset}: ${decodeError.message}`);
                     } else {
                         // Create error message
@@ -215,7 +262,12 @@ module.exports = function(RED) {
                                     offset: message.offset,
                                     key: message.key ? message.key.toString() : null,
                                     timestamp: message.timestamp,
-                                    rawValue: message.value
+                                    rawValue: message.value,
+                                    headers: message.headers || {},
+                                    dynamicConfig: message.headers && (message.headers['x-schema-subject'] || message.headers['x-registry-url']) ? {
+                                        schemaSubject: message.headers['x-schema-subject'] ? message.headers['x-schema-subject'].toString() : config.schemaSubject,
+                                        registryUrl: message.headers['x-registry-url'] ? message.headers['x-registry-url'].toString() : config.registryUrl
+                                    } : undefined
                                 }
                             }
                         };
@@ -284,55 +336,88 @@ module.exports = function(RED) {
             }
         }
 
-        node.getOrRegisterSchema = async function() {
+        node.getOrRegisterSchema = async function(dynamicSubject, dynamicRegistryUrl) {
+            const subject = dynamicSubject || config.schemaSubject;
+            const registryUrl = dynamicRegistryUrl || config.registryUrl;
+            
+            // Create new registry client if URL changed
+            let registryClient = node.schemaRegistry;
+            if (dynamicRegistryUrl && dynamicRegistryUrl !== config.registryUrl) {
+                node.debug(`[Kafka Schema Consumer] Creating new registry client for URL: ${dynamicRegistryUrl}`);
+                const registryConfig = {
+                    host: dynamicRegistryUrl,
+                    clientId: 'node-red-schema-consumer-dynamic',
+                    retry: {
+                        retries: 3,
+                        factor: 2,
+                        multiplier: 1000,
+                        maxRetryTimeInSecs: 60
+                    }
+                };
+
+                // Add authentication if configured
+                if (config.useRegistryAuth && config.registryUsername && config.registryPassword) {
+                    registryConfig.auth = {
+                        username: config.registryUsername,
+                        password: config.registryPassword,
+                    };
+                }
+                
+                registryClient = new SchemaRegistry(registryConfig);
+            }
+            
             try {
-                node.debug(`[Kafka Schema Consumer] Getting schema for subject: ${config.schemaSubject}`);
+                node.debug(`[Kafka Schema Consumer] Getting schema for subject: ${subject} from registry: ${registryUrl}`);
                 
                 // Try to get existing schema
                 try {
-                    const schemaId = await node.schemaRegistry.getLatestSchemaId(config.schemaSubject);
-                    node.debug(`[Kafka Schema Consumer] Found existing schema ID: ${schemaId}`);
+                    const schemaId = await registryClient.getLatestSchemaId(subject);
+                    node.debug(`[Kafka Schema Consumer] Found existing schema ID: ${schemaId} for subject: ${subject}`);
                     
-                    // Cache the schema for faster lookups
-                    const schema = await node.schemaRegistry.getSchema(schemaId);
-                    node.cachedSchemas.set(schemaId, schema);
-                    node.debug(`[Kafka Schema Consumer] Schema cached successfully`);
+                    // Cache the schema for faster lookups (only for main registry)
+                    if (!dynamicRegistryUrl || dynamicRegistryUrl === config.registryUrl) {
+                        const schema = await registryClient.getSchema(schemaId);
+                        node.cachedSchemas.set(schemaId, schema);
+                        node.debug(`[Kafka Schema Consumer] Schema cached successfully for subject: ${subject}`);
+                    }
                     
-                    return schemaId;
+                    return { schemaId, registryClient };
                 } catch (error) {
                     if (error.message.includes('Subject') && error.message.includes('not found')) {
-                        node.debug(`[Kafka Schema Consumer] Schema subject not found: ${config.schemaSubject}`);
+                        node.debug(`[Kafka Schema Consumer] Schema subject not found: ${subject}`);
                         
                         if (config.autoRegisterSchema && config.defaultSchema) {
-                            node.debug(`[Kafka Schema Consumer] Auto-registering schema`);
+                            node.debug(`[Kafka Schema Consumer] Auto-registering schema for subject: ${subject}`);
                             try {
                                 const schemaObj = JSON.parse(config.defaultSchema);
-                                const registered = await node.schemaRegistry.register({
+                                const registered = await registryClient.register({
                                     type: 'AVRO',
                                     schema: JSON.stringify(schemaObj)
                                 }, {
-                                    subject: config.schemaSubject
+                                    subject: subject
                                 });
                                 
-                                node.debug(`[Kafka Schema Consumer] Schema auto-registered with ID: ${registered.id}`);
+                                node.debug(`[Kafka Schema Consumer] Schema auto-registered with ID: ${registered.id} for subject: ${subject}`);
                                 
-                                // Cache the schema
-                                const schema = await node.schemaRegistry.getSchema(registered.id);
-                                node.cachedSchemas.set(registered.id, schema);
+                                // Cache the schema (only for main registry)
+                                if (!dynamicRegistryUrl || dynamicRegistryUrl === config.registryUrl) {
+                                    const schema = await registryClient.getSchema(registered.id);
+                                    node.cachedSchemas.set(registered.id, schema);
+                                }
                                 
-                                return registered.id;
+                                return { schemaId: registered.id, registryClient };
                             } catch (registerError) {
-                                throw new Error(`Failed to auto-register schema: ${registerError.message}`);
+                                throw new Error(`Failed to auto-register schema for subject ${subject}: ${registerError.message}`);
                             }
                         } else {
-                            throw new Error(`Schema subject '${config.schemaSubject}' not found and auto-registration is disabled`);
+                            throw new Error(`Schema subject '${subject}' not found and auto-registration is disabled`);
                         }
                     } else {
                         throw error;
                     }
                 }
             } catch (error) {
-                node.error(`[Kafka Schema Consumer] Schema operation failed: ${error.message}`);
+                node.error(`[Kafka Schema Consumer] Schema operation failed for subject ${subject}: ${error.message}`);
                 throw error;
             }
         };

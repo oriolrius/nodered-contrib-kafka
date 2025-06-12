@@ -25,6 +25,28 @@ This node can be used to produce and consume messages to/from Kafka. It consists
 - **Kafka Send** (hm-kafka-producer) - Send messages to Kafka topics  
 - **Kafka Receive** (hm-kafka-consumer) - Receive messages from Kafka topics
 - **Kafka Schema Send** (hm-kafka-schema-producer) - Send messages with Avro schema validation
+- **Kafka Schema Receive** (hm-kafka-schema-consumer) - Receive and decode Avro messages
+
+### Dynamic Configuration Support ⚡ NEW
+
+**All Kafka nodes now support dynamic configuration**, allowing you to override node settings using input message properties. This enables:
+
+- **Multi-tenant applications**: Route messages to different topics/schemas per tenant
+- **Environment-based routing**: Switch between dev/staging/production configurations
+- **A/B testing**: Route traffic to experimental configurations
+- **Runtime flexibility**: Change behavior without redeploying flows
+
+#### Quick Example
+```javascript
+// Function node before Kafka Producer
+msg.topic = "tenant-" + msg.payload.tenantId + "-events";
+msg.key = msg.payload.userId;
+msg.headers = {"tenant-id": msg.payload.tenantId};
+msg.requireAcks = msg.payload.critical ? 1 : 0;
+return msg;
+```
+
+**📚 See [Dynamic Configuration Guide](docs/DYNAMIC_CONFIGURATION_GUIDE.md) for complete documentation and examples.**
 
 ### Schema Registry Support
 

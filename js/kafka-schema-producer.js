@@ -104,10 +104,11 @@ module.exports = function (RED) {
             }
         };
 
-        node.getOrRegisterSchema = async function() {
+        node.getOrRegisterSchema = async function(dynamicSubject) {
+            const subject = dynamicSubject || config.schemaSubject;
             try {
                 // Try to get existing schema
-                if (node.cachedSchemaId) {
+                if (node.cachedSchemaId && subject === config.schemaSubject) {
                     node.debug(`[Kafka Schema Producer] Using cached schema ID: ${node.cachedSchemaId}`);
                     node.status({ fill: "blue", shape: "ring", text: "Using cached schema" });
                     return node.cachedSchemaId;
@@ -115,17 +116,19 @@ module.exports = function (RED) {
 
                 node.status({ fill: "blue", shape: "ring", text: "Getting schema..." });
                 try {
-                    const latestSchemaId = await node.schemaRegistry.getLatestSchemaId(config.schemaSubject);
-                    node.cachedSchemaId = latestSchemaId;
-                    node.debug(`[Kafka Schema Producer] Retrieved existing schema ID: ${latestSchemaId}`);
+                    const latestSchemaId = await node.schemaRegistry.getLatestSchemaId(subject);
+                    if (subject === config.schemaSubject) {
+                        node.cachedSchemaId = latestSchemaId;
+                    }
+                    node.debug(`[Kafka Schema Producer] Retrieved existing schema ID: ${latestSchemaId} for subject: ${subject}`);
                     node.status({ fill: "blue", shape: "ring", text: "Schema retrieved" });
                     return latestSchemaId;
                 } catch (error) {
-                    node.debug(`[Kafka Schema Producer] Schema not found: ${error.message}`);
+                    node.debug(`[Kafka Schema Producer] Schema not found for subject ${subject}: ${error.message}`);
                     
                     // If auto-register is enabled, register the schema
                     if (config.autoRegister && config.autoSchema) {
-                        node.debug(`[Kafka Schema Producer] Auto-registering schema for subject: ${config.schemaSubject}`);
+                        node.debug(`[Kafka Schema Producer] Auto-registering schema for subject: ${subject}`);
                         node.status({ fill: "blue", shape: "ring", text: "Registering schema..." });
                         
                         let schemaObject;
@@ -139,25 +142,39 @@ module.exports = function (RED) {
                             type: 'AVRO',
                             schema: JSON.stringify(schemaObject)
                         }, {
-                            subject: config.schemaSubject
+                            subject: subject
                         });
                         
-                        node.cachedSchemaId = registeredSchema.id;
-                        node.debug(`[Kafka Schema Producer] Registered new schema with ID: ${registeredSchema.id}`);
+                        if (subject === config.schemaSubject) {
+                            node.cachedSchemaId = registeredSchema.id;
+                        }
+                        node.debug(`[Kafka Schema Producer] Registered new schema with ID: ${registeredSchema.id} for subject: ${subject}`);
                         node.status({ fill: "blue", shape: "ring", text: "Schema registered" });
                         return registeredSchema.id;
                     } else {
-                        throw new Error(`Schema not found for subject ${config.schemaSubject} and auto-register is disabled`);
+                        throw new Error(`Schema not found for subject ${subject} and auto-register is disabled`);
                     }
                 }
             } catch (error) {
-                node.error(`[Kafka Schema Producer] Schema operation failed: ${error.message}`);
+                node.error(`[Kafka Schema Producer] Schema operation failed for subject ${subject}: ${error.message}`);
                 throw error;
             }
         };
 
         node.on('input', async function (msg) {
             node.debug(`[Kafka Schema Producer] Received input message`);
+            
+            // Dynamic configuration support
+            const dynamicConfig = {
+                topic: msg.topic || config.topic,
+                schemaSubject: msg.schemaSubject || config.schemaSubject,
+                registryUrl: msg.registryUrl || config.registryUrl,
+                requireAcks: msg.requireAcks !== undefined ? msg.requireAcks : config.requireAcks,
+                ackTimeoutMs: msg.ackTimeoutMs || config.ackTimeoutMs,
+                validateOnly: msg.validateOnly !== undefined ? msg.validateOnly : config.validateOnly
+            };
+            
+            node.debug(`[Kafka Schema Producer] Using dynamic config - Topic: ${dynamicConfig.topic}, Subject: ${dynamicConfig.schemaSubject}, ValidateOnly: ${dynamicConfig.validateOnly}`);
             
             if (!node.ready) {
                 node.warn(`[Kafka Schema Producer] Producer not ready, discarding message`);
@@ -168,8 +185,8 @@ module.exports = function (RED) {
             try {
                 node.status({ fill: "blue", shape: "dot", text: "Validating schema" });
                 
-                // Get or register schema
-                const schemaId = await node.getOrRegisterSchema();
+                // Get or register schema with dynamic subject
+                const schemaId = await node.getOrRegisterSchema(dynamicConfig.schemaSubject);
                 
                 // Prepare message data
                 let messageData = msg.payload;
@@ -199,7 +216,7 @@ module.exports = function (RED) {
                 }
 
                 // If validate-only mode, return the validated data without publishing
-                if (config.validateOnly) {
+                if (dynamicConfig.validateOnly) {
                     node.debug(`[Kafka Schema Producer] Validation-only mode, not publishing to Kafka`);
                     node.messageCount++;
                     node.status({ fill: "green", shape: "dot", text: `Validated ${node.messageCount} messages` });
@@ -207,15 +224,16 @@ module.exports = function (RED) {
                         validated: true, 
                         schemaId: schemaId, 
                         originalData: messageData,
-                        encodedSize: encodedMessage.length
+                        encodedSize: encodedMessage.length,
+                        subject: dynamicConfig.schemaSubject
                     };
                     node.send(msg);
                     return;
                 }
 
-                // Prepare Kafka message
+                // Prepare Kafka message with dynamic configuration
                 const kafkaMessage = {
-                    topic: config.topic,
+                    topic: dynamicConfig.topic,
                     messages: [
                         {
                             key: msg.key || (messageData.id ? messageData.id.toString() : null),
@@ -228,7 +246,7 @@ module.exports = function (RED) {
 
                 // Send to Kafka
                 node.status({ fill: "blue", shape: "dot", text: "Sending to Kafka" });
-                node.debug(`[Kafka Schema Producer] Publishing validated message to topic: ${config.topic}`);
+                node.debug(`[Kafka Schema Producer] Publishing validated message to topic: ${dynamicConfig.topic} with subject: ${dynamicConfig.schemaSubject}`);
                 const result = await node.producer.send(kafkaMessage);
                 
                 node.debug(`[Kafka Schema Producer] Message published successfully`);
