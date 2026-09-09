@@ -55,7 +55,7 @@
     "publishConfig": {
         "access": "public"
     },
-    "license": "MIT",
+    "license": "MIT AND Apache-2.0",
     "scripts": {
         "test": "node tests/run-tests.js",
         "test:simple": "node tests/simple-kafka-test.js",

@@ -1,3 +1,11 @@
+/*
+ * Copyright 2025 Oriol Rius
+ * Copyright 2026 Yehor Roshcha
+ *
+ * This file contains original MIT-licensed work and Apache-2.0-licensed fork
+ * modifications. See LICENSE, LICENSE-MIT, LICENSE-APACHE, and NOTICE.
+ * SPDX-License-Identifier: MIT AND Apache-2.0
+ */
 module.exports = function (RED) {
     const { SchemaRegistry, SchemaType } = require('@kafkajs/confluent-schema-registry');
     const { CompressionTypes, CompressionCodecs } = require('kafkajs');
