@@ -1,6 +1,6 @@
 {
     "name": "@yroshcha/node-red-contrib-kafka",
-    "version": "6.2.8",
+    "version": "6.2.9",
     "description": "Node-RED Kafka nodes: Send, Receive, and Schema validation with modern KafkaJS. Fork of @oriolrius/node-red-contrib-kafka adding Protobuf + Confluent Schema Registry support to the producer node.",
     "node-red": {
         "version": ">=3.0.0",
