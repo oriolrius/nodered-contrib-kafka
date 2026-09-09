@@ -1,4 +1,18 @@
-# @oriolrius/node-red-contrib-kafka
+# @yroshcha/node-red-contrib-kafka
+
+> This is a fork of [oriolrius/node-red-contrib-kafka](https://github.com/oriolrius/node-red-contrib-kafka),
+> adding Protobuf serialization (with Confluent Schema Registry wire-format
+> support) to the producer node, alongside the existing Avro mode. These
+> changes were originally submitted upstream as
+> [PR #4](https://github.com/oriolrius/node-red-contrib-kafka/pull/4); this
+> package is published separately since the PR has not received a maintainer
+> review. See [`docs/PROTOBUF_PRODUCER_GUIDE.md`](docs/PROTOBUF_PRODUCER_GUIDE.md)
+> for full usage details of the new capability.
+>
+> Node type names are prefixed `yroshcha-kafka-*` rather than
+> `oriolrius-kafka-*`, so this package can be installed safely alongside the
+> original `@oriolrius/node-red-contrib-kafka` in the same Node-RED instance
+> without type-registration conflicts.
 
 Kafka Consumer and Producer
 
@@ -16,15 +30,15 @@ This Node-RED Kafka client is based on the original `node-red-contrib-kafka` imp
 
 This node can be used to produce and consume messages to/from Kafka. It consists of five nodes:
 
-- **Kafka Broker** (oriolrius-kafka-broker) - Connection configuration
-- **Kafka Send** (oriolrius-kafka-producer) - Send messages to Kafka topics  
-- **Kafka Receive** (oriolrius-kafka-consumer) - Receive messages from Kafka topics
-- **Kafka Schema Send** (oriolrius-kafka-producer) - Send messages with Avro schema validation
-- **Kafka History Reader** (oriolrius-kafka-history-reader) - Retrieve historical messages by type
+- **Kafka Broker** (yroshcha-kafka-broker) - Connection configuration
+- **Kafka Send** (yroshcha-kafka-producer) - Send messages to Kafka topics  
+- **Kafka Receive** (yroshcha-kafka-consumer) - Receive messages from Kafka topics
+- **Kafka Schema Send** (yroshcha-kafka-producer) - Send messages with Avro schema validation
+- **Kafka History Reader** (yroshcha-kafka-history-reader) - Retrieve historical messages by type
 
 ### Schema Registry Support
 
-**NEW**: The `oriolrius-kafka-producer` node adds Avro schema validation support using Confluent Schema Registry. This node:
+**NEW**: The `yroshcha-kafka-producer` node adds Avro schema validation support using Confluent Schema Registry. This node:
 
 - Validates message payloads against registered Avro schemas
 - Supports both latest and specific schema versions for production stability
@@ -36,7 +50,7 @@ This node can be used to produce and consume messages to/from Kafka. It consists
 
 ### Kafka History Reader
 
-**NEW**: The `oriolrius-kafka-history-reader` node allows you to retrieve historical messages of specific types from Kafka topics. This is particularly useful for:
+**NEW**: The `yroshcha-kafka-history-reader` node allows you to retrieve historical messages of specific types from Kafka topics. This is particularly useful for:
 
 - Getting the last known values of specific message types before starting real-time consumption
 - Initializing your application state with historical data
@@ -62,7 +76,7 @@ These enhanced authentication mechanisms provide better security compared to the
 
 ## Installation
 ```
-npm install @oriolrius/node-red-contrib-kafka
+npm install @yroshcha/node-red-contrib-kafka
 ```
 
 ## Documentation
@@ -71,6 +85,7 @@ This project includes comprehensive documentation to help you get started and un
 
 ### Getting Started
 
+- **[Protobuf Producer Guide](docs/PROTOBUF_PRODUCER_GUIDE.md)** - Complete guide to Protobuf serialization (Schema Registry and raw modes) on the Kafka Send node
 - **[Schema Guide](docs/SCHEMA_GUIDE.md)** - Complete guide to using Avro schema validation and version management with the Schema Producer node
 - **[Kafka History Reader Guide](docs/KAFKA_HISTORY_READER_GUIDE.md)** - Complete guide to using the Kafka History Reader for retrieving historical messages
 - **[Migration Guide](docs/MIGRATION_GUIDE.md)** - Guide for migrating from legacy kafka-node based implementations

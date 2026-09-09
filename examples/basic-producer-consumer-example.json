@@ -33,7 +33,7 @@
     },
     {
         "id": "producer-node",
-        "type": "oriolrius-kafka-producer",
+        "type": "yroshcha-kafka-producer",
         "z": "example-flow",
         "name": "Send to Kafka",
         "broker": "broker-node",
@@ -71,7 +71,7 @@
     },
     {
         "id": "consumer-node",
-        "type": "oriolrius-kafka-consumer",
+        "type": "yroshcha-kafka-consumer",
         "z": "example-flow",
         "name": "Receive from Kafka",
         "broker": "broker-node",
@@ -128,7 +128,7 @@
     },
     {
         "id": "broker-node",
-        "type": "oriolrius-kafka-broker",
+        "type": "yroshcha-kafka-broker",
         "name": "Local Kafka",
         "hosts": "localhost:9092",
         "usesasl": false,

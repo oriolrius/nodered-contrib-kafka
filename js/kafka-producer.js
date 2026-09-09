@@ -1,27 +1,28 @@
+/*
+ * Copyright 2025 Oriol Rius
+ * Copyright 2026 Yehor Roshcha
+ *
+ * This file contains original MIT-licensed work and Apache-2.0-licensed fork
+ * modifications. See LICENSE, LICENSE-MIT, LICENSE-APACHE, and NOTICE.
+ * SPDX-License-Identifier: MIT AND Apache-2.0
+ */
 module.exports = function (RED) {
-    const { SchemaRegistry } = require('@kafkajs/confluent-schema-registry');
+    const { SchemaRegistry, SchemaType } = require('@kafkajs/confluent-schema-registry');
     const { CompressionTypes, CompressionCodecs } = require('kafkajs');
     const { getNameTypes, getMsgValues } = require('./utils');
 
-    // Register compression codecs
-    // KafkaJS expects factory functions that return codec instances
     try {
         const SnappyCodec = require('kafkajs-snappy');
-        CompressionCodecs[CompressionTypes.Snappy] = SnappyCodec;  // Factory function
-    } catch (error) {
-        // Snappy codec not available
-    }
+        CompressionCodecs[CompressionTypes.Snappy] = SnappyCodec;
+    } catch (error) { /* Snappy codec not available */ }
 
     try {
         const LZ4Codec = require('kafkajs-lz4');
-        CompressionCodecs[CompressionTypes.LZ4] = () => new LZ4Codec();  // Factory function wrapper
-    } catch (error) {
-        // LZ4 codec not available
-    }
+        CompressionCodecs[CompressionTypes.LZ4] = () => new LZ4Codec();
+    } catch (error) { /* LZ4 codec not available */ }
 
     function getIotOptions(config) {
         var options = new Object();
-
         if (config.useiot) {
             options = new Object();
             options.model = config.model;
@@ -29,7 +30,6 @@ module.exports = function (RED) {
             options.iotType = config.iotType;
             options.fields = config.fields;
         }
-
         return options;
     }
 
@@ -42,80 +42,117 @@ module.exports = function (RED) {
         node.cachedSchemaVersion = null;
         node.lastMessageTime = null;
         node.messageCount = 0;
+        node.protobufType = null;
+        node.protobufRoot = null;
 
         let iotOptions = {};
 
         node.init = function () {
-            const nodeType = config.useSchemaValidation ? 'Schema Producer' : 'Producer';
-            const versionInfo = config.useSchemaValidation && config.schemaVersion && config.schemaVersion.trim() !== '' 
+            // serializationType: 'avro' | 'protobuf'
+            // protobufMode:      'registry' (priority, uses Confluent SR) | 'raw' (protobufjs only)
+            const serializationType = config.serializationType || 'avro';
+            const protobufMode      = config.protobufMode || 'registry';
+
+            const nodeLabel = config.useSchemaValidation
+                ? (serializationType === 'protobuf'
+                    ? (protobufMode === 'raw' ? 'Protobuf Raw Producer' : 'Protobuf SR Producer')
+                    : 'Schema Producer')
+                : 'Producer';
+
+            const versionInfo = config.useSchemaValidation && config.schemaVersion && config.schemaVersion.trim() !== ''
                 ? ` (schema version: ${config.schemaVersion.trim()})` : '';
-            node.debug(`[Kafka ${nodeType}] Initializing ${nodeType.toLowerCase()} for topic: ${config.topic}${versionInfo}`);
-            node.status({ fill: "yellow", shape: "ring", text: "Initializing..." });
-            
+            node.debug(`[Kafka ${nodeLabel}] Initializing for topic: ${config.topic}${versionInfo}`);
+            node.status({ fill: 'yellow', shape: 'ring', text: 'Initializing...' });
+
             let broker = RED.nodes.getNode(config.broker);
             if (!broker) {
-                node.error(`[Kafka Schema Producer] No broker configuration found`);
-                node.status({ fill: "red", shape: "ring", text: "No broker config" });
+                node.error(`[Kafka ${nodeLabel}] No broker configuration found`);
+                node.status({ fill: 'red', shape: 'ring', text: 'No broker config' });
                 return;
             }
 
-            // Get IoT configuration from broker if available, otherwise use producer config
             if (broker && broker.getIotConfig) {
                 const brokerIotConfig = broker.getIotConfig();
-                if (brokerIotConfig.useiot) {
-                    iotOptions = brokerIotConfig;
-                    node.debug(`[Kafka Producer] Using IoT configuration from broker`);
-                } else {
-                    iotOptions = getIotOptions(config);
-                    node.debug(`[Kafka Producer] Using IoT configuration from producer`);
-                }
+                iotOptions = brokerIotConfig.useiot ? brokerIotConfig : getIotOptions(config);
             } else {
                 iotOptions = getIotOptions(config);
-                node.debug(`[Kafka Producer] Using producer IoT configuration`);
             }
-            
-            // Initialize Schema Registry only if schema validation is enabled
+
             if (config.useSchemaValidation) {
-                node.status({ fill: "yellow", shape: "ring", text: "Connecting to Schema Registry..." });
-            try {
-                const registryConfig = {
-                    host: config.registryUrl,
-                    clientId: 'node-red-schema-producer',
-                    retry: {
-                        retries: 3,
-                        factor: 2,
-                        multiplier: 1000,
-                        maxRetryTimeInSecs: 60
+
+                if (serializationType === 'protobuf') {
+                    // Always parse the .proto definition (needed for validation + raw encoding)
+                    node.status({ fill: 'yellow', shape: 'ring', text: 'Loading Protobuf schema...' });
+                    try {
+                        const protobuf = require('protobufjs');
+                        if (!config.protobufSchema || config.protobufSchema.trim() === '') {
+                            throw new Error('Protobuf schema (.proto) definition is required');
+                        }
+                        const messageName = config.protobufMessageName || 'Message';
+                        const root = protobuf.parse(config.protobufSchema, { keepCase: true }).root;
+                        node.protobufType = root.lookupType(messageName);
+                        node.protobufRoot = root;
+                        node.debug(`[Kafka Protobuf] Loaded .proto type "${messageName}"`);
+                    } catch (error) {
+                        node.error(`[Kafka Protobuf] Failed to parse .proto schema: ${error.message}`);
+                        node.status({ fill: 'red', shape: 'ring', text: `Proto parse error` });
+                        return;
                     }
-                };
 
-                // Add authentication if configured
-                if (config.useRegistryAuth && config.registryUsername && config.registryPassword) {
-                    registryConfig.auth = {
-                        username: config.registryUsername,
-                        password: config.registryPassword,
-                    };
-                    node.debug(`[Kafka Schema Producer] Schema Registry auth configured for user: ${config.registryUsername}`);
-                }
+                    if (protobufMode === 'registry') {
+                        // Protobuf + Schema Registry: register .proto in Confluent SR
+                        node.status({ fill: 'yellow', shape: 'ring', text: 'Connecting to SR (Protobuf)...' });
+                        try {
+                            const registryConfig = {
+                                host: config.registryUrl,
+                                clientId: 'node-red-protobuf-producer',
+                                retry: { retries: 3, factor: 2, multiplier: 1000, maxRetryTimeInSecs: 60 }
+                            };
+                            if (config.useRegistryAuth && config.registryUsername && config.registryPassword) {
+                                registryConfig.auth = { username: config.registryUsername, password: config.registryPassword };
+                            }
+                            node.schemaRegistry = new SchemaRegistry(registryConfig);
+                            node.debug(`[Kafka Protobuf SR] Registry client created: ${config.registryUrl}`);
+                            node.status({ fill: 'yellow', shape: 'ring', text: 'Protobuf SR connected' });
+                        } catch (error) {
+                            node.error(`[Kafka Protobuf SR] Failed to create SR client: ${error.message}`);
+                            node.status({ fill: 'red', shape: 'ring', text: 'SR failed' });
+                            return;
+                        }
+                    } else {
+                        node.debug(`[Kafka Protobuf Raw] No Schema Registry â raw encoding`);
+                        node.status({ fill: 'yellow', shape: 'ring', text: 'Protobuf raw mode' });
+                    }
 
-                node.schemaRegistry = new SchemaRegistry(registryConfig);
-                node.debug(`[Kafka Schema Producer] Schema Registry client created for: ${config.registryUrl}`);
-                node.status({ fill: "yellow", shape: "ring", text: "Registry connected" });
-                } catch (error) {
-                    node.error(`[Kafka Schema Producer] Failed to create Schema Registry client: ${error.message}`);
-                    node.status({ fill: "red", shape: "ring", text: `Registry failed: ${error.message.substring(0, 10)}...` });
-                    return;
+                } else {
+                    // Avro + Schema Registry
+                    node.status({ fill: 'yellow', shape: 'ring', text: 'Connecting to SR (Avro)...' });
+                    try {
+                        const registryConfig = {
+                            host: config.registryUrl,
+                            clientId: 'node-red-schema-producer',
+                            retry: { retries: 3, factor: 2, multiplier: 1000, maxRetryTimeInSecs: 60 }
+                        };
+                        if (config.useRegistryAuth && config.registryUsername && config.registryPassword) {
+                            registryConfig.auth = { username: config.registryUsername, password: config.registryPassword };
+                            node.debug(`[Kafka Avro SR] Auth configured for user: ${config.registryUsername}`);
+                        }
+                        node.schemaRegistry = new SchemaRegistry(registryConfig);
+                        node.debug(`[Kafka Avro SR] Registry client created: ${config.registryUrl}`);
+                        node.status({ fill: 'yellow', shape: 'ring', text: 'Avro SR connected' });
+                    } catch (error) {
+                        node.error(`[Kafka Avro SR] Failed to create SR client: ${error.message}`);
+                        node.status({ fill: 'red', shape: 'ring', text: 'Registry failed' });
+                        return;
+                    }
                 }
             } else {
-                node.debug(`[Kafka Producer] Schema validation disabled, skipping Schema Registry setup`);
+                node.debug(`[Kafka Producer] Schema validation disabled`);
             }
 
-            // Get Kafka client from broker
-            node.status({ fill: "yellow", shape: "ring", text: "Connecting to Kafka..." });
+            node.status({ fill: 'yellow', shape: 'ring', text: 'Connecting to Kafka...' });
             try {
                 const kafka = broker.getKafka();
-                node.debug(`[Kafka Schema Producer] Kafka instance obtained successfully`);
-                
                 const producer = kafka.producer({
                     maxInFlightRequests: 1,
                     idempotent: config.requireAcks === 1,
@@ -123,312 +160,359 @@ module.exports = function (RED) {
                 });
 
                 producer.connect().then(() => {
-                    node.debug(`[Kafka Schema Producer] Producer ready and connected to Kafka broker`);
+                    node.debug(`[Kafka Producer] Connected`);
                     node.ready = true;
                     node.lastMessageTime = new Date().getTime();
                     node.messageCount = 0;
-                    node.status({ fill: "green", shape: "ring", text: "Ready" });
-                    
-                    // Set up producer event handlers
-                    producer.on('producer.connect', () => {
-                        node.debug(`[Kafka Schema Producer] Producer connected to Kafka`);
-                        node.status({ fill: "green", shape: "ring", text: "Connected" });
-                    });
+                    node.status({ fill: 'green', shape: 'ring', text: 'Ready' });
 
+                    producer.on('producer.connect', () => {
+                        node.status({ fill: 'green', shape: 'ring', text: 'Connected' });
+                    });
                     producer.on('producer.disconnect', () => {
-                        node.debug(`[Kafka Schema Producer] Producer disconnected from Kafka`);
-                        node.status({ fill: "red", shape: "ring", text: "Disconnected" });
+                        node.status({ fill: 'red', shape: 'ring', text: 'Disconnected' });
                         node.ready = false;
                         node.lastMessageTime = null;
                         node.messageCount = 0;
                     });
-
-                    // Store producer reference
                     node.producer = producer;
-
                 }).catch(error => {
-                    node.error(`[Kafka Schema Producer] Failed to connect producer: ${error.message}`, error);
-                    node.status({ fill: "red", shape: "ring", text: `Connect failed: ${error.message.substring(0, 15)}...` });
+                    node.error(`[Kafka Producer] Failed to connect: ${error.message}`, error);
+                    node.status({ fill: 'red', shape: 'ring', text: `Connect failed` });
                     node.ready = false;
                     node.lastMessageTime = null;
                 });
-
             } catch (error) {
-                node.error(`[Kafka Schema Producer] Failed to get Kafka instance: ${error.message}`, error);
-                node.status({ fill: "red", shape: "ring", text: `Kafka failed: ${error.message.substring(0, 10)}...` });
+                node.error(`[Kafka Producer] Failed to get Kafka instance: ${error.message}`, error);
+                node.status({ fill: 'red', shape: 'ring', text: 'Kafka failed' });
                 node.ready = false;
                 node.lastMessageTime = null;
             }
         };
 
-        node.getOrRegisterSchema = async function() {
-            try {
-                const version = config.schemaVersion && config.schemaVersion.trim() !== '' ? config.schemaVersion.trim() : 'latest';
-                
-                // Check if we have a cached schema for the current version
-                if (node.cachedSchemaId && node.cachedSchemaVersion === version) {
-                    node.debug(`[Kafka Schema Producer] Using cached schema ID: ${node.cachedSchemaId} for version: ${version}`);
-                    node.status({ fill: "blue", shape: "ring", text: `Using cached schema v${version}` });
-                    return node.cachedSchemaId;
-                }
+        // ââ Avro: get / auto-register schema from Confluent SR âââââââââââââââââââ
+        node.getOrRegisterAvroSchema = async function () {
+            const version = config.schemaVersion && config.schemaVersion.trim() !== ''
+                ? config.schemaVersion.trim() : 'latest';
 
-                // Cache miss or version changed - fetch schema
-                node.debug(`[Kafka Schema Producer] Cache miss or version changed. Fetching schema for version: ${version}`);
-                node.status({ fill: "blue", shape: "ring", text: "Getting schema..." });
-                try {
-                    let schemaId;
-                    
-                    if (version === 'latest') {
-                        schemaId = await node.schemaRegistry.getLatestSchemaId(config.schemaSubject);
-                        node.debug(`[Kafka Schema Producer] Retrieved latest schema ID: ${schemaId} for subject: ${config.schemaSubject}`);
-                    } else {
-                        // Get specific version
-                        const versionNumber = parseInt(version);
-                        if (isNaN(versionNumber) || versionNumber <= 0) {
-                            throw new Error(`Invalid schema version: ${version}. Must be 'latest' or a positive integer.`);
-                        }
-                        
-                        schemaId = await node.schemaRegistry.getRegistryId(config.schemaSubject, versionNumber);
-                        node.debug(`[Kafka Schema Producer] Retrieved schema ID: ${schemaId} for subject: ${config.schemaSubject}, version: ${versionNumber}`);
-                    }
-                    
-                    // Cache the schema ID and version
-                    node.cachedSchemaId = schemaId;
-                    node.cachedSchemaVersion = version;
-                    node.status({ fill: "blue", shape: "ring", text: `Schema v${version} retrieved` });
-                    return schemaId;
-                } catch (error) {
-                    node.debug(`[Kafka Schema Producer] Schema not found: ${error.message}`);
-                    
-                    // If auto-register is enabled, register the schema
-                    if (config.autoRegister && config.autoSchema) {
-                        // Only allow auto-registration for 'latest' version
-                        if (version !== 'latest') {
-                            throw new Error(`Cannot auto-register schema for specific version ${version}. Auto-registration only works with 'latest' version.`);
-                        }
-                        
-                        node.debug(`[Kafka Schema Producer] Auto-registering schema for subject: ${config.schemaSubject}`);
-                        node.status({ fill: "blue", shape: "ring", text: "Registering schema..." });
-                        
-                        let schemaObject;
-                        try {
-                            schemaObject = JSON.parse(config.autoSchema);
-                        } catch (parseError) {
-                            throw new Error(`Invalid schema JSON: ${parseError.message}`);
-                        }
-
-                        const registeredSchema = await node.schemaRegistry.register({
-                            type: 'AVRO',
-                            schema: JSON.stringify(schemaObject)
-                        }, {
-                            subject: config.schemaSubject
-                        });
-                        
-                        // Cache the registered schema
-                        node.cachedSchemaId = registeredSchema.id;
-                        node.cachedSchemaVersion = version;
-                        node.debug(`[Kafka Schema Producer] Registered new schema with ID: ${registeredSchema.id}`);
-                        node.status({ fill: "blue", shape: "ring", text: "Schema registered" });
-                        return registeredSchema.id;
-                    } else {
-                        throw new Error(`Schema not found for subject ${config.schemaSubject}, version ${version}, and auto-register is disabled`);
-                    }
-                }
-            } catch (error) {
-                node.error(`[Kafka Schema Producer] Schema operation failed: ${error.message}`);
-                throw error;
+            if (node.cachedSchemaId && node.cachedSchemaVersion === version) {
+                node.debug(`[Kafka Avro SR] Using cached schema ID: ${node.cachedSchemaId}`);
+                node.status({ fill: 'blue', shape: 'ring', text: `Cached schema v${version}` });
+                return node.cachedSchemaId;
             }
+
+            node.debug(`[Kafka Avro SR] Fetching schema, version: ${version}`);
+            node.status({ fill: 'blue', shape: 'ring', text: 'Getting Avro schema...' });
+
+            let schemaId;
+            if (version === 'latest') {
+                if (config.autoRegister && config.autoSchema) {
+                    let schemaObject;
+                    try { schemaObject = JSON.parse(config.autoSchema); }
+                    catch (e) { throw new Error(`Invalid Avro schema JSON: ${e.message}`); }
+                    const registered = await node.schemaRegistry.register(
+                        { type: SchemaType.AVRO, schema: JSON.stringify(schemaObject) },
+                        { subject: config.schemaSubject }
+                    );
+                    schemaId = registered.id;
+                    node.debug(`[Kafka Avro SR] Schema registered/found, ID: ${schemaId}`);
+                } else {
+                    schemaId = await node.schemaRegistry.getLatestSchemaId(config.schemaSubject);
+                    node.debug(`[Kafka Avro SR] Latest ID for "${config.schemaSubject}": ${schemaId}`);
+                }
+            } else {
+                schemaId = await node.schemaRegistry.getSchemaId(config.schemaSubject, parseInt(version));
+                node.debug(`[Kafka Avro SR] Schema ID for v${version}: ${schemaId}`);
+            }
+
+            node.cachedSchemaId = schemaId;
+            node.cachedSchemaVersion = version;
+            node.status({ fill: 'blue', shape: 'ring', text: `Avro schema v${version} cached` });
+            return schemaId;
         };
 
+        // ââ Protobuf + Schema Registry: register .proto and encode âââââââââââââââ
+        //    Registers the .proto definition in Confluent SR (type PROTOBUF),
+        //    then uses schemaRegistry.encode() which prepends the Confluent wire
+        //    format header (magic byte 0x00 + 4-byte schema ID).
+        node.getOrRegisterProtobufSchema = async function () {
+            const version = config.schemaVersion && config.schemaVersion.trim() !== ''
+                ? config.schemaVersion.trim() : 'latest';
+
+            if (node.cachedSchemaId && node.cachedSchemaVersion === version) {
+                node.debug(`[Kafka Protobuf SR] Using cached schema ID: ${node.cachedSchemaId}`);
+                node.status({ fill: 'blue', shape: 'ring', text: `Cached proto schema v${version}` });
+                return node.cachedSchemaId;
+            }
+
+            node.debug(`[Kafka Protobuf SR] Fetching/registering .proto schema, version: ${version}`);
+            node.status({ fill: 'blue', shape: 'ring', text: 'Getting Protobuf schema...' });
+
+            let schemaId;
+            if (version === 'latest') {
+                if (config.autoRegister && config.protobufSchema) {
+                    // Register (or idempotently get existing) .proto schema in SR
+                    const registered = await node.schemaRegistry.register(
+                        { type: SchemaType.PROTOBUF, schema: config.protobufSchema },
+                        { subject: config.schemaSubject }
+                    );
+                    schemaId = registered.id;
+                    node.debug(`[Kafka Protobuf SR] .proto registered/found in SR, ID: ${schemaId}`);
+                } else {
+                    schemaId = await node.schemaRegistry.getLatestSchemaId(config.schemaSubject);
+                    node.debug(`[Kafka Protobuf SR] Latest ID for "${config.schemaSubject}": ${schemaId}`);
+                }
+            } else {
+                schemaId = await node.schemaRegistry.getSchemaId(config.schemaSubject, parseInt(version));
+                node.debug(`[Kafka Protobuf SR] Schema ID for v${version}: ${schemaId}`);
+            }
+
+            node.cachedSchemaId = schemaId;
+            node.cachedSchemaVersion = version;
+            node.status({ fill: 'blue', shape: 'ring', text: `Proto schema v${version} cached` });
+            return schemaId;
+        };
+
+        // ââ Protobuf raw: pure protobufjs encoding, no Schema Registry ââââââââââââ
+        node.encodeProtobufRaw = function (messageData) {
+            if (!node.protobufType) {
+                throw new Error('Protobuf type not loaded. Check your .proto schema definition.');
+            }
+            const errMsg = node.protobufType.verify(messageData);
+            if (errMsg) throw new Error(`Protobuf validation error: ${errMsg}`);
+            const protoMsg = node.protobufType.create(messageData);
+            return Buffer.from(node.protobufType.encode(protoMsg).finish());
+        };
+
+        // ââ Input handler âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
         node.on('input', async function (msg) {
-            const nodeType = config.useSchemaValidation ? 'Schema Producer' : 'Producer';
-            node.debug(`[Kafka ${nodeType}] Received input message`);
-            
+            const serializationType = config.serializationType || 'avro';
+            const protobufMode      = config.protobufMode || 'registry';
+
+            const nodeLabel = config.useSchemaValidation
+                ? (serializationType === 'protobuf'
+                    ? (protobufMode === 'raw' ? 'Protobuf Raw Producer' : 'Protobuf SR Producer')
+                    : 'Schema Producer')
+                : 'Producer';
+
+            node.debug(`[Kafka ${nodeLabel}] Received input message`);
+
             if (!node.ready) {
-                node.warn(`[Kafka ${nodeType}] Producer not ready, discarding message`);
-                node.status({ fill: "yellow", shape: "ring", text: "Not ready" });
+                node.warn(`[Kafka ${nodeLabel}] Producer not ready, skipping message`);
                 return;
             }
 
             try {
                 let messageData = msg.payload;
-                let encodedMessage;
-                let schemaId = null;
+                if (typeof messageData === 'string') {
+                    try { messageData = JSON.parse(messageData); } catch (e) { /* keep as string */ }
+                }
 
-                // Handle schema validation if enabled
-                if (config.useSchemaValidation) {
-                    node.status({ fill: "blue", shape: "dot", text: "Validating schema" });
-                    
-                    // Get or register schema
-                    schemaId = await node.getOrRegisterSchema();
-                    
-                    // Prepare message data for schema validation
+                // IoT formatting
+                if (iotOptions && iotOptions.useiot) {
                     if (typeof messageData === 'string') {
-                        try {
-                            messageData = JSON.parse(messageData);
-                        } catch (parseError) {
-                            node.error(`[Kafka Schema Producer] Failed to parse message payload as JSON: ${parseError.message}`);
-                            node.status({ fill: "red", shape: "ring", text: "Parse error" });
+                        try { messageData = JSON.parse(messageData); }
+                        catch (parseError) {
+                            node.error(`[Kafka ${nodeLabel}] Failed to parse payload as JSON: ${parseError.message}`);
+                            node.status({ fill: 'red', shape: 'ring', text: 'Parse error' });
                             return;
                         }
                     }
-
-                    node.debug(`[Kafka Schema Producer] Message data to validate:`, messageData);
-
-                    // Encode message with schema validation
-                    node.status({ fill: "blue", shape: "dot", text: "Encoding message" });
-                    try {
-                        encodedMessage = await node.schemaRegistry.encode(schemaId, messageData);
-                        node.debug(`[Kafka Schema Producer] Message validated and encoded successfully`);
-                    } catch (encodeError) {
-                        node.error(`[Kafka Schema Producer] Schema validation failed: ${encodeError.message}`);
-                        node.status({ fill: "red", shape: "ring", text: "Validation failed" });
-                        node.send([null, { payload: { error: encodeError.message, data: messageData } }]);
-                        return;
-                    }
-
-                    // If validate-only mode, return the validated data without publishing
-                    if (config.validateOnly) {
-                        node.debug(`[Kafka Schema Producer] Validation-only mode, not publishing to Kafka`);
-                        node.messageCount++;
-                        node.status({ fill: "green", shape: "dot", text: `Validated ${node.messageCount} messages` });
-                        msg.payload = { 
-                            validated: true, 
-                            schemaId: schemaId, 
-                            originalData: messageData,
-                            encodedSize: encodedMessage.length
-                        };
-                        node.send(msg);
-                        return;
-                    }
-                } else {
-                    // No schema validation - handle IoT formatting and prepare message
-                    node.status({ fill: "blue", shape: "dot", text: "Preparing message" });
-                    
-                    if (iotOptions.useiot) {
-                        if (msg.broker && msg.broker.model && msg.broker.device) {
-                            iotOptions.model = msg.broker.model;
-                            iotOptions.device = msg.broker.device;
-                        }
-                        
-                        const nameTypes = getNameTypes(iotOptions.fields);
-                        const msgValues = getMsgValues(messageData, iotOptions.fields);
-                        
-                        messageData = {
-                            mc: iotOptions.model,
-                            dc: iotOptions.device,
-                            type: iotOptions.iotType,
-                            nameTypes: nameTypes,
-                            ts: [new Date().getTime()],
-                            values: [msgValues]
-                        };
-                        
-                        node.debug(`[Kafka Producer] IoT formatted message:`, messageData);
-                    }
-                    
-                    // For non-schema mode, serialize message as JSON
-                    if (typeof messageData === 'object') {
-                        encodedMessage = JSON.stringify(messageData);
-                    } else {
-                        encodedMessage = messageData;
-                    }
+                    const nameTypes = getNameTypes(iotOptions.fields);
+                    const msgValues = getMsgValues(messageData, iotOptions.fields);
+                    messageData = {
+                        mc: iotOptions.model, dc: iotOptions.device,
+                        type: iotOptions.iotType, nameTypes,
+                        ts: [new Date().getTime()], values: [msgValues]
+                    };
                 }
 
-                // Prepare Kafka message
-                const kafkaMessage = {
-                    topic: config.topic,
-                    messages: [
-                        {
-                            key: msg.key || (messageData && messageData.id ? messageData.id.toString() : null),
-                            value: encodedMessage,
-                            timestamp: msg.timestamp || Date.now().toString(),
-                            headers: msg.headers || {}
-                        },
-                    ],
-                };
+                let serializedValue;
 
-                // Apply compression if configured (attributes: 0=None, 1=GZIP, 2=Snappy, 3=LZ4)
-                if (config.attributes && config.attributes > 0) {
-                    kafkaMessage.compression = config.attributes;
-                    node.debug(`[Kafka ${nodeType}] Using compression type: ${config.attributes}`);
-                }
-
-                // Send to Kafka
-                node.status({ fill: "blue", shape: "dot", text: "Sending to Kafka" });
-                node.debug(`[Kafka ${nodeType}] Publishing message to topic: ${config.topic}`);
-                const result = await node.producer.send(kafkaMessage);
-                
-                node.debug(`[Kafka ${nodeType}] Message published successfully`);
-                node.lastMessageTime = new Date().getTime();
-                node.messageCount++;
-                node.status({ fill: "green", shape: "dot", text: `Sent ${node.messageCount} messages` });
-                
-                // Send success response
-                const responsePayload = {
-                    success: true,
-                    kafkaResult: result,
-                    originalData: messageData,
-                    topic: config.topic
-                };
-                
                 if (config.useSchemaValidation) {
-                    responsePayload.schemaId = schemaId;
+
+                    if (serializationType === 'protobuf') {
+
+                        if (protobufMode === 'registry') {
+                            // ââ Protobuf + Schema Registry (priority) âââââââââââââ
+                            node.debug(`[Kafka Protobuf SR] Encoding via Schema Registry`);
+                            node.status({ fill: 'blue', shape: 'dot', text: 'Encoding (proto-sr)' });
+
+                            const schemaId = await node.getOrRegisterProtobufSchema();
+
+                            if (config.validateOnly) {
+                                const errMsg = node.protobufType
+                                    ? node.protobufType.verify(messageData)
+                                    : 'Protobuf type not loaded';
+                                if (errMsg) {
+                                    node.warn(`[Kafka Protobuf SR] Validation failed: ${errMsg}`);
+                                    node.status({ fill: 'yellow', shape: 'ring', text: 'Validation failed' });
+                                    msg.payload = { validated: false, error: errMsg };
+                                    node.send(msg);
+                                    return;
+                                }
+                                node.status({ fill: 'green', shape: 'ring', text: 'Validated (not sent)' });
+                                msg.payload = { validated: true, schemaId };
+                                node.send(msg);
+                                return;
+                            }
+
+                            // schemaRegistry.encode prepends magic byte + schema ID header
+                            serializedValue = await node.schemaRegistry.encode(schemaId, messageData);
+
+                            // Confluent Protobuf wire format requires a message index byte (0x00 for
+                            // the first/only message type) at position 5, right after the 5-byte header
+                            // (magic byte 0x00 + 4-byte schema ID). Some SR client versions omit it.
+                            if (serializedValue.length > 5 && serializedValue.readUInt8(5) !== 0) {
+                                const patched = Buffer.alloc(serializedValue.length + 1);
+                                serializedValue.copy(patched, 0, 0, 5);   // copy 5-byte header
+                                patched.writeUInt8(0, 5);                  // insert message index 0x00
+                                serializedValue.copy(patched, 6, 5);       // copy protobuf payload
+                                serializedValue = patched;
+                                node.debug('[Kafka Protobuf SR] Inserted missing Confluent message index byte');
+                            }
+                            node.debug(`[Kafka Protobuf SR] Encoded with schema ID: ${schemaId}`);
+
+                        } else {
+                            // ââ Protobuf raw (no Schema Registry) âââââââââââââââââ
+                            node.debug(`[Kafka Protobuf Raw] Encoding with protobufjs`);
+                            node.status({ fill: 'blue', shape: 'dot', text: 'Encoding (proto-raw)' });
+
+                            if (config.validateOnly) {
+                                const errMsg = node.protobufType
+                                    ? node.protobufType.verify(messageData)
+                                    : 'Protobuf type not loaded';
+                                if (errMsg) {
+                                    node.warn(`[Kafka Protobuf Raw] Validation failed: ${errMsg}`);
+                                    node.status({ fill: 'yellow', shape: 'ring', text: 'Validation failed' });
+                                    msg.payload = { validated: false, error: errMsg };
+                                    node.send(msg);
+                                    return;
+                                }
+                                node.status({ fill: 'green', shape: 'ring', text: 'Validated (not sent)' });
+                                msg.payload = { validated: true };
+                                node.send(msg);
+                                return;
+                            }
+
+                            serializedValue = node.encodeProtobufRaw(messageData);
+                            node.debug(`[Kafka Protobuf Raw] Encoded to ${serializedValue.length} bytes`);
+                        }
+
+                    } else {
+                        // ââ Avro + Schema Registry âââââââââââââââââââââââââââââââââ
+                        node.debug(`[Kafka Avro SR] Encoding via Schema Registry`);
+                        node.status({ fill: 'blue', shape: 'dot', text: 'Encoding (avro)' });
+
+                        const schemaId = await node.getOrRegisterAvroSchema();
+
+                        if (config.validateOnly) {
+                            try {
+                                await node.schemaRegistry.encode(schemaId, messageData);
+                                node.status({ fill: 'green', shape: 'ring', text: 'Validated (not sent)' });
+                                msg.payload = { validated: true, schemaId };
+                                node.send(msg);
+                            } catch (validationError) {
+                                node.warn(`[Kafka Avro SR] Validation failed: ${validationError.message}`);
+                                node.status({ fill: 'yellow', shape: 'ring', text: 'Validation failed' });
+                                msg.payload = { validated: false, error: validationError.message };
+                                node.send(msg);
+                            }
+                            return;
+                        }
+
+                        serializedValue = await node.schemaRegistry.encode(schemaId, messageData);
+                        node.debug(`[Kafka Avro SR] Encoded with schema ID: ${schemaId}`);
+                    }
+
+                } else {
+                    serializedValue = typeof messageData === 'string' ? messageData : JSON.stringify(messageData);
                 }
-                
-                msg.payload = responsePayload;
+
+                const topic = msg.topic || config.topic;
+                const kafkaMessage = { value: serializedValue };
+
+                if (msg.key !== undefined) {
+                    kafkaMessage.key = typeof msg.key === 'string' ? msg.key : JSON.stringify(msg.key);
+                } else if (config.messageKey && config.messageKey.trim() !== '') {
+                    kafkaMessage.key = config.messageKey.trim();
+                }
+                if (msg.headers && typeof msg.headers === 'object') {
+                    kafkaMessage.headers = msg.headers;
+                }
+
+                node.debug(`[Kafka ${nodeLabel}] Sending to topic: ${topic}`);
+                node.status({ fill: 'blue', shape: 'dot', text: 'Sending...' });
+
+                const compressionType = config.compressionType !== undefined
+                    ? Number(config.compressionType) : CompressionTypes.None;
+
+                await node.producer.send({ topic, compression: compressionType, messages: [kafkaMessage] });
+
+                node.messageCount++;
+                node.lastMessageTime = new Date().getTime();
+
+                let serTag = '';
+                if (config.useSchemaValidation) {
+                    serTag = serializationType === 'protobuf'
+                        ? (protobufMode === 'raw' ? ' [proto-raw]' : ' [proto-sr]')
+                        : ' [avro]';
+                }
+                node.status({ fill: 'green', shape: 'dot', text: `Sent${serTag} #${node.messageCount}` });
+
+                msg.payload = {
+                    topic,
+                    messageCount: node.messageCount,
+                    timestamp: node.lastMessageTime,
+                    serialization: config.useSchemaValidation
+                        ? (serializationType === 'protobuf'
+                            ? (protobufMode === 'raw' ? 'protobuf-raw' : 'protobuf-registry')
+                            : 'avro')
+                        : 'none'
+                };
                 node.send(msg);
 
             } catch (error) {
-                const nodeType = config.useSchemaValidation ? 'Schema Producer' : 'Producer';
-                node.error(`[Kafka ${nodeType}] Error processing message: ${error.message}`, error);
-                node.status({ fill: "red", shape: "ring", text: `Error: ${error.message.substring(0, 15)}...` });
+                node.error(`[Kafka Producer] Error: ${error.message}`, error);
+                node.status({ fill: 'red', shape: 'ring', text: `Error: ${error.message.substring(0, 15)}...` });
                 node.lastMessageTime = null;
-                node.send([null, { payload: { error: error.message, originalMessage: msg } }]);
             }
         });
 
-        // Function to check for idle state and update status
-        function checkLastMessageTime() {
-            if (node.lastMessageTime != null && node.ready) {
-                const timeDiff = new Date().getTime() - node.lastMessageTime;
-                if (timeDiff > 5000) {
-                    const idleSeconds = Math.floor(timeDiff/1000);
-                    const countText = node.messageCount > 0 ? ` (${node.messageCount} sent)` : '';
-                    node.debug(`[Kafka Schema Producer] Producer idle for ${timeDiff}ms`);
-                    node.status({ fill: "yellow", shape: "ring", text: `Idle ${idleSeconds}s${countText}` });
+        node.checkLastMessageTime = function () {
+            if (node.lastMessageTime) {
+                const serializationType = config.serializationType || 'avro';
+                const protobufMode      = config.protobufMode || 'registry';
+                let serTag = '';
+                if (config.useSchemaValidation) {
+                    serTag = serializationType === 'protobuf'
+                        ? (protobufMode === 'raw' ? ' [proto-raw]' : ' [proto-sr]')
+                        : ' [avro]';
                 }
+                const timeSince = new Date().getTime() - node.lastMessageTime;
+                const minutes = Math.floor(timeSince / 60000);
+                const seconds = Math.floor((timeSince % 60000) / 1000);
+                node.status({ fill: 'green', shape: 'ring',
+                    text: `Ready${serTag} | Last: ${minutes}m ${seconds}s | Count: ${node.messageCount}` });
             }
-        }
-
-        // Start idle monitoring
-        node.interval = setInterval(checkLastMessageTime, 1000);
+        };
 
         node.on('close', function (done) {
-            node.debug(`[Kafka Schema Producer] Closing node`);
+            node.debug(`[Kafka Producer] Node closing`);
             node.ready = false;
-            node.status({});
-            node.lastMessageTime = null;
-            node.messageCount = 0;
-            node.cachedSchemaId = null;
-            node.cachedSchemaVersion = null;
-            clearInterval(node.interval);
-            
+            node.protobufType = null;
+            node.protobufRoot = null;
             if (node.producer) {
-                node.producer.disconnect().then(() => {
-                    node.debug(`[Kafka Schema Producer] Producer disconnected`);
-                    done();
-                }).catch(error => {
-                    node.error(`[Kafka Schema Producer] Error disconnecting producer: ${error.message}`);
-                    done();
-                });
+                node.producer.disconnect()
+                    .then(() => { node.debug('[Kafka Producer] Disconnected'); done(); })
+                    .catch(error => { node.error(`[Kafka Producer] Error: ${error.message}`); done(); });
             } else {
                 done();
             }
         });
 
-        // Initialize the node
         node.init();
     }
 
-    RED.nodes.registerType("oriolrius-kafka-producer", KafkaProducerNode);
+    RED.nodes.registerType('yroshcha-kafka-producer', KafkaProducerNode);
 };

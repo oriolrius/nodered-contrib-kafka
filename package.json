@@ -1,14 +1,14 @@
 {
-    "name": "@oriolrius/node-red-contrib-kafka",
-    "version": "6.1.1",
-    "description": "Node-RED Kafka nodes: Send, Receive, and Schema validation with modern KafkaJS",
+    "name": "@yroshcha/node-red-contrib-kafka",
+    "version": "6.2.10",
+    "description": "Node-RED Kafka nodes: Send, Receive, and Schema validation with modern KafkaJS. Fork of @oriolrius/node-red-contrib-kafka adding Protobuf + Confluent Schema Registry support to the producer node.",
     "node-red": {
         "version": ">=3.0.0",
         "nodes": {
-            "oriolrius-kafka-broker": "./js/kafka-broker.js",
-            "oriolrius-kafka-producer": "./js/kafka-producer.js",
-            "oriolrius-kafka-consumer": "./js/kafka-consumer.js",
-            "oriolrius-kafka-history-reader": "./js/kafka-history-reader.js"
+            "yroshcha-kafka-broker": "./js/kafka-broker.js",
+            "yroshcha-kafka-producer": "./js/kafka-producer.js",
+            "yroshcha-kafka-consumer": "./js/kafka-consumer.js",
+            "yroshcha-kafka-history-reader": "./js/kafka-history-reader.js"
         },
         "keywords": [
             "node-red",
@@ -17,6 +17,8 @@
             "kafka-broker",
             "kafka-history",
             "kafkajs",
+            "protobuf",
+            "schema-registry",
             "big-data",
             "node-red-contrib"
         ]
@@ -30,22 +32,30 @@
         "node-red",
         "kafka-broker",
         "kafkajs",
+        "protobuf",
+        "schema-registry",
         "big-data",
         "data"
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/oriolrius/node-red-contrib-kafka"
+        "url": "git+https://github.com/YRoshcha/node-red-contrib-kafka.git"
     },
     "bugs": {
-        "url": "https://github.com/oriolrius/node-red-contrib-kafka/issues"
+        "url": "https://github.com/YRoshcha/node-red-contrib-kafka/issues"
     },
-    "homepage": "https://github.com/oriolrius/node-red-contrib-kafka/blob/main/README.md",
+    "homepage": "https://github.com/YRoshcha/node-red-contrib-kafka/blob/main/README.md",
     "author": "oriolrius",
+    "contributors": [
+        {
+            "name": "YRoshcha",
+            "url": "https://github.com/YRoshcha"
+        }
+    ],
     "publishConfig": {
         "access": "public"
     },
-    "license": "MIT",
+    "license": "MIT AND Apache-2.0",
     "scripts": {
         "test": "node tests/run-tests.js",
         "test:simple": "node tests/simple-kafka-test.js",
@@ -59,7 +69,8 @@
         "@kafkajs/confluent-schema-registry": "^3.9.0",
         "kafkajs": "^2.2.4",
         "kafkajs-lz4": "^1.2.1",
-        "kafkajs-snappy": "^1.1.0"
+        "kafkajs-snappy": "^1.1.0",
+        "protobufjs": "^7.4.0"
     },
     "devDependencies": {
         "dotenv": "^17.0.0",

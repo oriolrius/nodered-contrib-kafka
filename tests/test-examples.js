@@ -56,7 +56,7 @@ exampleFiles.forEach(file => {
 
     // Test 4: Check for our Kafka nodes
     const kafkaNodes = flow.filter(n =>
-        n.type && n.type.startsWith('oriolrius-kafka-')
+        n.type && n.type.startsWith('yroshcha-kafka-')
     );
     console.log(`  ✅ Found ${kafkaNodes.length} Kafka nodes`);
 
@@ -110,7 +110,7 @@ exampleFiles.forEach(file => {
     // Test 7: Check Kafka node configurations
     let configErrors = 0;
     kafkaNodes.forEach(node => {
-        if (node.type === 'oriolrius-kafka-producer') {
+        if (node.type === 'yroshcha-kafka-producer') {
             if (!node.topic) {
                 console.log(`  ❌ Producer ${node.id}: missing required field 'topic'`);
                 configErrors++;
@@ -125,14 +125,14 @@ exampleFiles.forEach(file => {
             }
         }
 
-        if (node.type === 'oriolrius-kafka-consumer') {
+        if (node.type === 'yroshcha-kafka-consumer') {
             if (!node.topic) {
                 console.log(`  ❌ Consumer ${node.id}: missing required field 'topic'`);
                 configErrors++;
             }
         }
 
-        if (node.type === 'oriolrius-kafka-history-reader') {
+        if (node.type === 'yroshcha-kafka-history-reader') {
             if (!node.topic) {
                 console.log(`  ❌ History Reader ${node.id}: missing required field 'topic'`);
                 configErrors++;

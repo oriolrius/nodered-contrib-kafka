@@ -1,4 +1,4 @@
-<script type="text/html" data-help-name="oriolrius-kafka-history-reader">
+<script type="text/html" data-help-name="yroshcha-kafka-history-reader">
     <p>Retrieves historical messages from a Kafka topic starting from a specific offset.</p>
     
     <h3>Details</h3>
@@ -80,7 +80,7 @@
     debugging specific message ranges in your Kafka topics.</p>
 </script>
 
-<script type="text/html" data-template-name="oriolrius-kafka-history-reader">
+<script type="text/html" data-template-name="yroshcha-kafka-history-reader">
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Kafka History Reader">
@@ -159,13 +159,16 @@
 </script>
 
 <script type="text/javascript">
-    RED.nodes.registerType('oriolrius-kafka-history-reader', {
+(function() {
+"use strict";
+
+    RED.nodes.registerType('yroshcha-kafka-history-reader', {
         category: 'IOT',
         paletteLabel: "kafka history",
         color: '#CE93D8',
         defaults: {
             name: { required: false },
-            broker: { type: "oriolrius-kafka-broker", required: true },
+            broker: { type: "yroshcha-kafka-broker", required: true },
             topic: { required: true },
             maxMessages: { value: 10, required: true, validate: function(v) { 
                 return v > 0 && v <= 1000; 
@@ -221,4 +224,6 @@
             }
         }
     });
+
+})();
 </script>

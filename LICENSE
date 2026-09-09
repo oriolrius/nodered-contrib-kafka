@@ -1,0 +1,9 @@
+This distribution contains code under more than one license.
+
+Original work by Oriol Rius remains licensed under the MIT License; see
+LICENSE-MIT. Yehor Roshcha's fork modifications are licensed under the Apache
+License, Version 2.0; see LICENSE-APACHE.
+
+Files that combine original and fork code identify this with the SPDX expression
+MIT AND Apache-2.0. See NOTICE for the attribution and scope of the fork
+modifications.

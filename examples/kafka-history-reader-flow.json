@@ -43,7 +43,7 @@
     },
     {
         "id": "history-reader",
-        "type": "oriolrius-kafka-history-reader",
+        "type": "yroshcha-kafka-history-reader",
         "z": "history-reader-example",
         "name": "Read IoT History",
         "broker": "kafka-broker-config",
@@ -168,7 +168,7 @@
     },
     {
         "id": "realtime-consumer",
-        "type": "oriolrius-kafka-consumer",
+        "type": "yroshcha-kafka-consumer",
         "z": "history-reader-example",
         "name": "Real-time IoT Consumer",
         "broker": "kafka-broker-config",
@@ -229,7 +229,7 @@
     },
     {
         "id": "kafka-broker-config",
-        "type": "oriolrius-kafka-broker",
+        "type": "yroshcha-kafka-broker",
         "name": "Local Kafka",
         "hosts": "localhost:9092",
         "clientId": "node-red-client",

@@ -1,12 +1,24 @@
-<script type="text/html" data-help-name="oriolrius-kafka-producer">
+<!--
+  Copyright 2025 Oriol Rius
+  Copyright 2026 Yehor Roshcha
+
+  This file contains original MIT-licensed work and Apache-2.0-licensed fork
+  modifications. See LICENSE, LICENSE-MIT, LICENSE-APACHE, and NOTICE.
+  SPDX-License-Identifier: MIT AND Apache-2.0
+-->
+<script type="text/html" data-help-name="yroshcha-kafka-producer">
     <p>Send messages to a Kafka topic.</p>
     <p>This node publishes the incoming message payload to the specified Kafka topic.</p>
-    <p>Optionally validates message payloads against registered Avro schemas using Confluent Schema Registry.</p>
-    <p>Supports message compression, acknowledgment settings, and IoT cloud data formatting.</p>
-    <p>On successful send, the node status shows "Sending". On failure, shows "Error".</p>
+    <p>Supports three serialization modes:</p>
+    <ul>
+        <li><strong>Avro</strong> â Confluent Schema Registry with Avro encoding</li>
+        <li><strong>Protobuf + Schema Registry</strong> (priority) â registers .proto in Confluent SR, encodes with magic byte + schema ID (Confluent wire format)</li>
+        <li><strong>Protobuf raw</strong> â pure protobufjs encoding without Schema Registry</li>
+    </ul>
+    <p>Node status shows: <code>[avro]</code>, <code>[proto-sr]</code>, or <code>[proto-raw]</code>.</p>
 </script>
 
-<script type="text/html" data-template-name="oriolrius-kafka-producer">
+<script type="text/html" data-template-name="yroshcha-kafka-producer">
 
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name </label>
@@ -46,66 +58,111 @@
     <!-- Schema Validation Section -->
     <hr/>
     <div class="form-row">
-		<input type="checkbox" id="node-input-useSchemaValidation" style="display: inline-block; width: auto; vertical-align: top;">
-		<label for="node-input-useSchemaValidation" style="width: auto">Enable Schema Validation</label>
-	</div>
-
-    <!-- Schema Registry Configuration (shown only when schema validation is enabled) -->
-    <div id="node-config-schema" style="display: none;">
-        <div class="form-row">
-            <h4><i class="fa fa-cog"></i> Schema Registry Configuration</h4>
-        </div>
-
-        <div class="form-row">
-            <label for="node-input-registryUrl"><i class="fa fa-globe"></i> Registry URL </label>
-            <input type="text" id="node-input-registryUrl" placeholder="http://localhost:8081">
-        </div>
-
-        <div class="form-row">
-            <label for="node-input-schemaSubject"><i class="fa fa-file-code-o"></i> Schema Subject </label>
-            <input type="text" id="node-input-schemaSubject" placeholder="my-topic-value">
-        </div>
-
-        <div class="form-row">
-            <label for="node-input-schemaVersion"><i class="fa fa-code-fork"></i> Schema Version </label>
-            <input type="text" id="node-input-schemaVersion" placeholder="latest (or specific version like 1, 2, 3...)">
-        </div>
-
-        <div class="form-row">
-    		<input type="checkbox" id="node-input-useRegistryAuth" style="display: inline-block; width: auto; vertical-align: top;">
-    		<label for="node-input-useRegistryAuth" style="width: auto">Use Registry Authentication</label>
-    	</div>
-
-        <div id="node-config-registry-auth" class="form-row" style="display: none;">
-            <div class="form-row">
-                <label for="node-input-registryUsername"><i class="fa fa-user"></i> Username </label>
-                <input type="text" id="node-input-registryUsername" placeholder="Username">
-            </div>
-            <div class="form-row">
-                <label for="node-input-registryPassword"><i class="fa fa-lock"></i> Password </label>
-                <input type="password" id="node-input-registryPassword" placeholder="Password">
-            </div>
-        </div>
-
-        <div class="form-row">
-    		<input type="checkbox" id="node-input-autoRegister" style="display: inline-block; width: auto; vertical-align: top;">
-    		<label for="node-input-autoRegister" style="width: auto">Auto-register schema if not found</label>
-    	</div>
-
-        <div id="node-config-auto-schema" class="form-row" style="display: none;">
-            <div class="form-row">
-                <label for="node-input-autoSchema"><i class="fa fa-code"></i> Default Schema (JSON) </label>
-                <textarea id="node-input-autoSchema" rows="8" placeholder='{"type": "record", "name": "Message", "fields": [{"name": "id", "type": "string"}, {"name": "message", "type": "string"}]}'></textarea>
-            </div>
-        </div>
-
-        <div class="form-row">
-    		<input type="checkbox" id="node-input-validateOnly" style="display: inline-block; width: auto; vertical-align: top;">
-    		<label for="node-input-validateOnly" style="width: auto">Validate schema only (don't publish)</label>
-    	</div>
+        <input type="checkbox" id="node-input-useSchemaValidation" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-useSchemaValidation" style="width: auto">Enable Schema Validation</label>
     </div>
 
-    <!-- IoT Configuration Section -->
+    <div id="node-config-schema" style="display: none;">
+
+        <!-- Serialization Type -->
+        <div class="form-row">
+            <label for="node-input-serializationType"><i class="fa fa-exchange"></i> Serialization</label>
+            <select id="node-input-serializationType" style="width: 70%;">
+                <option value="avro">Avro (Confluent Schema Registry)</option>
+                <option value="protobuf">Protobuf</option>
+            </select>
+        </div>
+
+        <!-- Protobuf mode selector — shown only when Protobuf selected -->
+        <div id="node-config-protobuf-mode" style="display: none;">
+            <div class="form-row">
+                <label for="node-input-protobufMode"><i class="fa fa-database"></i> Mode</label>
+                <select id="node-input-protobufMode" style="width: 70%;">
+                    <option value="registry">Schema Registry (Confluent SR + magic byte) — recommended</option>
+                    <option value="raw">Raw (protobufjs only, no Schema Registry)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Schema Registry fields — shared for Avro and Protobuf-SR -->
+        <div id="node-config-sr">
+            <div class="form-row">
+                <h4><i class="fa fa-cog"></i> Schema Registry Configuration</h4>
+            </div>
+            <div class="form-row">
+                <label for="node-input-registryUrl"><i class="fa fa-globe"></i> Registry URL</label>
+                <input type="text" id="node-input-registryUrl" placeholder="http://localhost:8081">
+            </div>
+            <div class="form-row">
+                <label for="node-input-schemaSubject"><i class="fa fa-file-code-o"></i> Schema Subject</label>
+                <input type="text" id="node-input-schemaSubject" placeholder="my-topic-value">
+            </div>
+            <div class="form-row">
+                <label for="node-input-schemaVersion"><i class="fa fa-code-fork"></i> Schema Version</label>
+                <input type="text" id="node-input-schemaVersion" placeholder="latest">
+            </div>
+
+            <!-- Auth -->
+            <div class="form-row">
+                <input type="checkbox" id="node-input-useRegistryAuth" style="display: inline-block; width: auto; vertical-align: top;">
+                <label for="node-input-useRegistryAuth" style="width: auto">Use Schema Registry Authentication</label>
+            </div>
+            <div id="node-config-registry-auth" style="display: none;">
+                <div class="form-row">
+                    <label for="node-input-registryUsername"><i class="fa fa-user"></i> Username</label>
+                    <input type="text" id="node-input-registryUsername" placeholder="username">
+                </div>
+                <div class="form-row">
+                    <label for="node-input-registryPassword"><i class="fa fa-lock"></i> Password</label>
+                    <input type="password" id="node-input-registryPassword" placeholder="password">
+                </div>
+            </div>
+
+            <!-- Auto-register -->
+            <div class="form-row">
+                <input type="checkbox" id="node-input-autoRegister" style="display: inline-block; width: auto; vertical-align: top;">
+                <label for="node-input-autoRegister" style="width: auto">Auto-register schema</label>
+            </div>
+            <div id="node-config-auto-schema" style="display: none;">
+                <!-- Avro: JSON schema textarea -->
+                <div id="node-config-avro-schema">
+                    <div class="form-row">
+                        <label for="node-input-autoSchema"><i class="fa fa-file-text-o"></i> Avro Schema (JSON)</label>
+                        <textarea id="node-input-autoSchema" rows="6" style="width: 70%; font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
+                </div>
+                <!-- Protobuf-SR: note that .proto below will be used -->
+                <div id="node-config-proto-schema-note" style="display: none;">
+                    <div class="form-row">
+                        <p><i class="fa fa-info-circle"></i> The <strong>.proto schema</strong> defined below will be registered in the Schema Registry.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Protobuf .proto fields — shown for both SR and raw Protobuf modes -->
+        <div id="node-config-proto-fields" style="display: none;">
+            <div class="form-row">
+                <h4><i class="fa fa-cog"></i> Protobuf Schema</h4>
+            </div>
+            <div class="form-row">
+                <label for="node-input-protobufMessageName"><i class="fa fa-cube"></i> Message Name</label>
+                <input type="text" id="node-input-protobufMessageName" placeholder="Message" style="width: 70%;">
+            </div>
+            <div class="form-row">
+                <label for="node-input-protobufSchema"><i class="fa fa-file-code-o"></i> .proto Schema</label>
+                <textarea id="node-input-protobufSchema" rows="10" style="width: 70%; font-family: monospace; font-size: 12px;" placeholder='syntax = "proto3";&#10;&#10;message Message {&#10;  string id = 1;&#10;  string payload = 2;&#10;  int64 timestamp = 3;&#10;}'></textarea>
+            </div>
+        </div>
+
+        <!-- Validate Only (shared) -->
+        <div class="form-row">
+            <input type="checkbox" id="node-input-validateOnly" style="display: inline-block; width: auto; vertical-align: top;">
+            <label for="node-input-validateOnly" style="width: auto">Validate schema only (don't publish)</label>
+        </div>
+    </div>
+
+<!-- IoT Configuration Section -->
     <hr/>
     <div class="form-row">
 		<input type="checkbox" id="node-input-useiot" style="display: inline-block; width: auto; vertical-align: top;">
@@ -148,17 +205,27 @@
 </script>
 
 <script type="text/javascript">
-    RED.nodes.registerType('oriolrius-kafka-producer', {
+(function() {
+"use strict";
+
+    RED.nodes.registerType('yroshcha-kafka-producer', {
         category: 'IOT',
         paletteLabel: "Kafka Send",
         color: '#CE93D8',
         defaults: {
             name: { required: false },
-            broker: { type: "oriolrius-kafka-broker" },
+            broker: { type: "yroshcha-kafka-broker" },
             topic: { required: true },
             requireAcks: { value: 1, required: true },
             ackTimeoutMs: { value: 100, required: true },
             attributes: { value: 0 },
+            // Serialization Type (avro|protobuf), defaults to avro for backward compat
+            serializationType: { value: 'avro' },
+            // Protobuf Mode: 'registry' (priority, Confluent SR) | 'raw' (protobufjs only)
+            protobufMode: { value: 'registry' },
+            // Protobuf Configuration
+            protobufSchema: { required: false, value: '' },
+            protobufMessageName: { required: false, value: 'Message' },
             // Schema Validation
             useSchemaValidation: { value: false },
             // Schema Registry Configuration
@@ -186,17 +253,58 @@
         },
         oneditprepare: function() {
             var node = this;
-            
-            // Show/hide schema validation fields
+
+            // ── helpers ──────────────────────────────────────────────────────
+            function updateSRVisibility() {
+                var serType   = $("#node-input-serializationType").val();
+                var protoMode = $("#node-input-protobufMode").val();
+                var needSR    = (serType === 'avro') || (serType === 'protobuf' && protoMode === 'registry');
+
+                if (needSR) {
+                    $("#node-config-sr").show();
+                } else {
+                    $("#node-config-sr").hide();
+                }
+
+                // Inside auto-register block: show Avro JSON or proto note
+                if (serType === 'avro') {
+                    $("#node-config-avro-schema").show();
+                    $("#node-config-proto-schema-note").hide();
+                } else {
+                    $("#node-config-avro-schema").hide();
+                    $("#node-config-proto-schema-note").show();
+                }
+            }
+
+            // ── Serialization type ────────────────────────────────────────────
             $("#node-input-useSchemaValidation").change(function() {
                 if ($(this).is(":checked")) {
                     $("#node-config-schema").show();
+                    $("#node-input-serializationType").trigger('change');
                 } else {
                     $("#node-config-schema").hide();
                 }
             });
 
-            // Show/hide registry auth fields
+            $("#node-input-serializationType").change(function() {
+                var serType = $(this).val();
+                if (serType === 'protobuf') {
+                    $("#node-config-protobuf-mode").show();
+                    $("#node-config-proto-fields").show();
+                    $("#node-input-protobufMode").trigger('change');
+                } else {
+                    $("#node-config-protobuf-mode").hide();
+                    $("#node-config-proto-fields").hide();
+                    updateSRVisibility();
+                }
+            });
+
+            // ── Protobuf mode ─────────────────────────────────────────────────
+            $("#node-input-protobufMode").change(function() {
+                updateSRVisibility();
+            });
+
+            // ── Registry auth ─────────────────────────────────────────────────
             $("#node-input-useRegistryAuth").change(function() {
                 if ($(this).is(":checked")) {
                     $("#node-config-registry-auth").show();
@@ -205,7 +313,7 @@
                 }
             });
 
-            // Show/hide auto schema registration fields
+            // ── Auto-register schema ──────────────────────────────────────────
             $("#node-input-autoRegister").change(function() {
                 if ($(this).is(":checked")) {
                     $("#node-config-auto-schema").show();
@@ -214,37 +322,37 @@
                 }
             });
 
-            // Show/hide IoT configuration
-            $("#node-input-useiot").change(function() {
-                if ($(this).is(":checked")) {
-                    $("#node-config-iot").show();
-                } else {
-                    $("#node-config-iot").hide();
-                }
-            });
-
-            // Initialize visibility based on current values
+            // ── Restore visibility on edit open ───────────────────────────────
             if (this.useSchemaValidation) {
                 $("#node-config-schema").show();
+                var serType   = this.serializationType || 'avro';
+                var protoMode = this.protobufMode || 'registry';
+
+                $("#node-input-serializationType").val(serType);
+                $("#node-input-protobufMode").val(protoMode);
+
+                if (serType === 'protobuf') {
+                    $("#node-config-protobuf-mode").show();
+                    $("#node-config-proto-fields").show();
+                }
+                updateSRVisibility();
+
+                if (this.useRegistryAuth) {
+                    $("#node-config-registry-auth").show();
+                }
+                if (this.autoRegister) {
+                    $("#node-config-auto-schema").show();
+                }
             }
-            if (this.useRegistryAuth) {
-                $("#node-config-registry-auth").show();
-            }
-            if (this.autoRegister) {
-                $("#node-config-auto-schema").show();
-            }
+
+            // ── IoT fields ────────────────────────────────────────────────────
             if (this.useiot) {
                 $("#node-config-iot").show();
             }
 
-            // IoT Fields configuration
             function generateField(i, field) {
                 var container = $('<li/>', { style: "background: #fff; margin:0; padding:8px 0px; border-bottom: 1px solid #ccc;" });
                 var row = $('<div/>').appendTo(container);
-                var row2 = $('<div/>', { style: "padding-top: 5px;" }).appendTo(container);
-
-                $('<i style="color: #eee; cursor: move; margin-right: 3px;" class="fa fa-bars"></i>').appendTo(row);
-
                 var fieldName = $('<input/>', {
                     class: "node-input-field-name",
                     type: "text",
@@ -259,45 +367,33 @@
 
                 dataType.append('<option value="TEXT">TEXT</option>');
                 dataType.append('<option value="INT32">INT32</option>');
+                dataType.append('<option value="INT64">INT64</option>');
                 dataType.append('<option value="FLOAT">FLOAT</option>');
+                dataType.append('<option value="DOUBLE">DOUBLE</option>');
                 dataType.append('<option value="BOOLEAN">BOOLEAN</option>');
-                dataType.val(field.dataType);
 
-                var finalspan = $('<span/>', { style: "float: right; margin-right: 8px;" }).appendTo(row);
-                var deleteButton = $('<a/>', {
-                    href: "#",
-                    class: "editor-button editor-button-small",
-                    style: "margin-top: 7px; margin-left: 5px;"
-                }).appendTo(finalspan);
-                $('<i/>', { class: "fa fa-remove" }).appendTo(deleteButton);
+                dataType.val(field.dataType || "TEXT");
 
-                deleteButton.click(function() {
-                    container.fadeOut(300, function() {
-                        $(this).remove();
-                    });
-                });
+                $('<a/>', { href: "#", class: "editor-button editor-button-small", style: "margin-left: 5px;" })
+                    .html('<i class="fa fa-trash"></i>')
+                    .appendTo(row)
+                    .click(function() { container.remove(); });
 
-                $("#node-input-fields-container").append(container);
+                return container;
             }
 
-            // Add existing fields
-            for (var i = 0; i < this.fields.length; i++) {
-                generateField(i + 1, this.fields[i]);
-            }
-
-            // Add field button
-            $('<a href="#" class="editor-button" id="node-input-field-add" style="margin-top: 4px;"><i class="fa fa-plus"></i> Add Field</a>')
-                .appendTo($("#node-input-fields-container").parent())
-                .click(function() {
-                    generateField($("#node-input-fields-container").children().length + 1, { fieldName: "", dataType: "TEXT" });
-                });
-
-            // Make fields sortable
-            $("#node-input-fields-container").sortable({
-                axis: "y",
-                handle: ".fa-bars",
-                cursor: "move"
+            $("#node-input-add-field").click(function() {
+                var field = { fieldName: "", dataType: "TEXT" };
+                var container = generateField($("#node-input-fields-container").children().length, field);
+                container.appendTo($("#node-input-fields-container"));
+                container.find(".node-input-field-name").focus();
             });
+
+            var fields = node.fields || [];
+            for (var i = 0; i < fields.length; i++) {
+                var container = generateField(i, fields[i]);
+                container.appendTo($("#node-input-fields-container"));
+            }
         },
         oneditsave: function() {
             var fields = [];
@@ -314,4 +410,6 @@
             this.fields = fields;
         }
     });
+
+})();
 </script>

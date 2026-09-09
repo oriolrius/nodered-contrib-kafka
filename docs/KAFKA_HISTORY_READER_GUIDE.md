@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `oriolrius-kafka-history-reader` node allows you to retrieve historical messages of specific types from a Kafka topic. This is particularly useful when you need to get the last known values of certain message types before starting real-time consumption.
+The `yroshcha-kafka-history-reader` node allows you to retrieve historical messages of specific types from a Kafka topic. This is particularly useful when you need to get the last known values of certain message types before starting real-time consumption.
 
 ## Key Features
 
@@ -212,8 +212,8 @@ return msg;
 
 This node is designed to work seamlessly with the existing Kafka nodes:
 
-- **oriolrius-kafka-broker**: Shared broker configuration
-- **oriolrius-kafka-consumer**: For real-time message consumption
-- **oriolrius-kafka-producer**: For sending responses based on historical data
+- **yroshcha-kafka-broker**: Shared broker configuration
+- **yroshcha-kafka-consumer**: For real-time message consumption
+- **yroshcha-kafka-producer**: For sending responses based on historical data
 
 The history reader complements rather than replaces the standard consumer, providing a complete solution for both historical and real-time Kafka message processing.

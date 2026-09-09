@@ -1,5 +1,3 @@
-
-
 module.exports = {
     getNameTypes: (fields = []) => {
         console.log(`[Utils] Processing ${fields.length} field definitions`);

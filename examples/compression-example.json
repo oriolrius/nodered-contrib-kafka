@@ -33,7 +33,7 @@
     },
     {
         "id": "producer-gzip",
-        "type": "oriolrius-kafka-producer",
+        "type": "yroshcha-kafka-producer",
         "z": "compression-flow",
         "name": "GZIP Producer",
         "broker": "compression-broker",
@@ -96,7 +96,7 @@
     },
     {
         "id": "producer-snappy",
-        "type": "oriolrius-kafka-producer",
+        "type": "yroshcha-kafka-producer",
         "z": "compression-flow",
         "name": "Snappy Producer",
         "broker": "compression-broker",
@@ -159,7 +159,7 @@
     },
     {
         "id": "producer-lz4",
-        "type": "oriolrius-kafka-producer",
+        "type": "yroshcha-kafka-producer",
         "z": "compression-flow",
         "name": "LZ4 Producer",
         "broker": "compression-broker",
@@ -197,7 +197,7 @@
     },
     {
         "id": "consumer-compressed",
-        "type": "oriolrius-kafka-consumer",
+        "type": "yroshcha-kafka-consumer",
         "z": "compression-flow",
         "name": "Receive All (Auto-decompress)",
         "broker": "compression-broker",
@@ -254,7 +254,7 @@
     },
     {
         "id": "compression-broker",
-        "type": "oriolrius-kafka-broker",
+        "type": "yroshcha-kafka-broker",
         "name": "Local Kafka",
         "hosts": "localhost:9092",
         "usesasl": false,

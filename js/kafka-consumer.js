@@ -319,5 +319,5 @@ module.exports = function(RED) {
         node.init();
     }
     
-    RED.nodes.registerType("oriolrius-kafka-consumer", KafkaConsumerNode);
+    RED.nodes.registerType("yroshcha-kafka-consumer", KafkaConsumerNode);
 }

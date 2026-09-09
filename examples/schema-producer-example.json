@@ -33,7 +33,7 @@
     },
     {
         "id": "schema-producer",
-        "type": "oriolrius-kafka-producer",
+        "type": "yroshcha-kafka-producer",
         "z": "example-schema-flow",
         "name": "Kafka Schema Send",
         "broker": "kafka-broker",
@@ -109,7 +109,7 @@
     },
     {
         "id": "kafka-broker",
-        "type": "oriolrius-kafka-broker",
+        "type": "yroshcha-kafka-broker",
         "name": "Local Kafka",
         "hosts": "localhost:9092",
         "usesasl": false,

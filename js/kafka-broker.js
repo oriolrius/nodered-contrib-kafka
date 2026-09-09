@@ -1,4 +1,3 @@
-
 module.exports = function (RED) {
     const fs = require('fs');
     const { Kafka } = require('kafkajs');
@@ -96,5 +95,5 @@ module.exports = function (RED) {
 
     }
 
-    RED.nodes.registerType("oriolrius-kafka-broker", KafkaBrokerNode);
+    RED.nodes.registerType("yroshcha-kafka-broker", KafkaBrokerNode);
 }

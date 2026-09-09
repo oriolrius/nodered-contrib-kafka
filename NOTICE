@@ -1,0 +1,19 @@
+This package is a fork of @oriolrius/node-red-contrib-kafka and contains work
+under multiple licenses.
+
+Original work:
+Oriol Rius
+https://github.com/oriolrius/node-red-contrib-kafka
+
+The original work and its unmodified portions remain available under the MIT
+License. See LICENSE-MIT.
+
+Fork modifications:
+Yehor Roshcha
+https://github.com/YRoshcha/node-red-contrib-kafka
+
+Yehor Roshcha's fork modifications, including the Protobuf and Confluent Schema
+Registry producer implementation and its documentation, are licensed under the
+Apache License, Version 2.0. See LICENSE-APACHE.
+
+Files containing both original and fork code are marked MIT AND Apache-2.0.

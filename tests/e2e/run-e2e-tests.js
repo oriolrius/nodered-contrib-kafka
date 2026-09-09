@@ -150,13 +150,13 @@ async function testBasicProducerConsumer() {
     const flow = [
         {
             id: 'broker-1',
-            type: 'oriolrius-kafka-broker',
+            type: 'yroshcha-kafka-broker',
             name: 'Test Broker',
             hosts: KAFKA_BROKER
         },
         {
             id: 'producer-1',
-            type: 'oriolrius-kafka-producer',
+            type: 'yroshcha-kafka-producer',
             broker: 'broker-1',
             topic: TEST_TOPIC,
             requireAcks: 1,
@@ -167,7 +167,7 @@ async function testBasicProducerConsumer() {
         },
         {
             id: 'consumer-1',
-            type: 'oriolrius-kafka-consumer',
+            type: 'yroshcha-kafka-consumer',
             broker: 'broker-1',
             topic: TEST_TOPIC,
             groupid: 'e2e-test-group',
@@ -241,13 +241,13 @@ async function testCompression() {
         const flow = [
             {
                 id: 'broker-comp',
-                type: 'oriolrius-kafka-broker',
+                type: 'yroshcha-kafka-broker',
                 name: 'Test Broker',
                 hosts: KAFKA_BROKER
             },
             {
                 id: 'producer-comp',
-                type: 'oriolrius-kafka-producer',
+                type: 'yroshcha-kafka-producer',
                 broker: 'broker-comp',
                 topic: COMPRESSION_TOPIC,
                 requireAcks: 1,
@@ -258,7 +258,7 @@ async function testCompression() {
             },
             {
                 id: 'consumer-comp',
-                type: 'oriolrius-kafka-consumer',
+                type: 'yroshcha-kafka-consumer',
                 broker: 'broker-comp',
                 topic: COMPRESSION_TOPIC,
                 groupid: 'e2e-compression-group-' + compression.value,
@@ -311,13 +311,13 @@ async function testMultipleMessages() {
     const flow = [
         {
             id: 'broker-batch',
-            type: 'oriolrius-kafka-broker',
+            type: 'yroshcha-kafka-broker',
             name: 'Test Broker',
             hosts: KAFKA_BROKER
         },
         {
             id: 'producer-batch',
-            type: 'oriolrius-kafka-producer',
+            type: 'yroshcha-kafka-producer',
             broker: 'broker-batch',
             topic: TEST_TOPIC + '-batch',
             requireAcks: 1,
@@ -328,7 +328,7 @@ async function testMultipleMessages() {
         },
         {
             id: 'consumer-batch',
-            type: 'oriolrius-kafka-consumer',
+            type: 'yroshcha-kafka-consumer',
             broker: 'broker-batch',
             topic: TEST_TOPIC + '-batch',
             groupid: 'e2e-batch-group',

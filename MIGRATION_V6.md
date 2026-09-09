@@ -1,5 +1,17 @@
 # Migration Guide: v5.x to v6.0.0
 
+> **Note (this fork):** this guide documents the original `hm-kafka-*` →
+> `oriolrius-kafka-*` rename that [oriolrius](https://github.com/oriolrius/node-red-contrib-kafka)
+> made in the upstream project's v6.0.0, before this fork existed. Everything
+> below is historical background, kept for anyone still migrating from a
+> pre-v6 install. If you're installing this fork fresh, none of this applies
+> to you - just `npm install @yroshcha/node-red-contrib-kafka` and use the
+> `yroshcha-kafka-*` node types directly, per the main [README.md](README.md).
+> If you *are* migrating from an old `hm-kafka-*` install and want to land on
+> this fork, treat it as two hops: `hm-kafka-*` → `oriolrius-kafka-*` (as
+> described below) → `yroshcha-kafka-*` (find/replace once more, or just
+> re-drag fresh nodes from the palette).
+
 ## Breaking Changes
 
 Version 6.0.0 introduces a **breaking change** to resolve naming conflicts with other Kafka packages in the Node-RED ecosystem.
@@ -107,8 +119,9 @@ If you prefer to update your flows before deploying:
 
 If you encounter issues during migration:
 
-1. Check the [GitHub Issues](https://github.com/oriolrius/node-red-contrib-kafka/issues)
-2. Create a new issue with:
+1. Check the [GitHub Issues](https://github.com/oriolrius/node-red-contrib-kafka/issues) (for the original v5→v6 hm-/oriolrius- rename described above)
+2. For anything specific to this fork (`yroshcha-kafka-*` types, Protobuf producer support), use [this fork's issues](https://github.com/YRoshcha/node-red-contrib-kafka/issues) instead
+3. Create a new issue with:
    - Your Node-RED version
    - Package version (old and new)
    - Error messages or screenshots
