@@ -1,0 +1,9 @@
+This package is a fork of @oriolrius/node-red-contrib-kafka.
+
+Original work:
+Oriol Rius
+https://github.com/oriolrius/node-red-contrib-kafka
+
+Fork modifications:
+Yehor Roshcha
+https://github.com/YRoshcha/node-red-contrib-kafka
